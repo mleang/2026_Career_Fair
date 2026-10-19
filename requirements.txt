@@ -15,3 +15,5 @@ argon2-cffi
 
 # Optional local environment variables
 python-dotenv>=1.0,<2
+
+setuptools>=68,<82

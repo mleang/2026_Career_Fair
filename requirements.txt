@@ -4,6 +4,7 @@ pandas>=2.0,<3
 
 # Cloud storage
 dropbox>=11.36,<12
+setuptools
 
 # Optional (utile pour charger des variables locales si besoin)
 python-dotenv>=1.0,<2

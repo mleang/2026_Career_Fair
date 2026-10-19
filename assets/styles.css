@@ -1,0 +1,237 @@
+/* largeur & espacements */
+.main .block-container{max-width:1100px;padding-top:1.2rem;padding-bottom:0.5rem;}
+/* titre + sous-titre */
+h1.app-title{font-size:2.0rem;line-height:1.2;margin:0;}
+p.app-subtitle{color:#6b7280;margin-top:0.25rem;font-size:0.95rem;}
+/* séparateur doux */
+.hr-soft{height:1px;border:0;background:linear-gradient(90deg,transparent,#e5e7eb,transparent);margin:0.8rem 0 1rem;}
+/* boutons et checkboxes */
+.stButton>button{border-radius:10px;padding:0.55rem 0.9rem;}
+.stCheckbox label{font-weight:500;}
+/* bouton de téléchargement pleine largeur */
+div.stDownloadButton>button{width:100%;}
+/* (décommente si tu veux masquer menu/footer) */
+/* #MainMenu{visibility:hidden;} footer{visibility:hidden;} */
+
+@media (prefers-color-scheme: dark){
+  .main .block-container{ /* un peu plus de contraste en dark */
+    background: transparent;
+  }
+}
+
+
+/* =========================
+   Header
+   ========================= */
+
+/* .app-header {
+    padding-top: 8px;
+}
+
+.app-title {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.15;
+    margin-bottom: 0.25rem;
+}
+
+.app-subtitle {
+    font-size: 1rem;
+    color: #666;
+}
+
+.account-box {
+    text-align: right;
+    padding-top: 8px;
+    margin-bottom: 6px;
+}
+
+.account-user {
+    font-size: 0.95rem;
+    font-weight: 600;
+    white-space: nowrap;
+} */
+
+/* ---------- App header ---------- */
+.app-header {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 72px;
+  gap: 4px;
+}
+
+/* .app-title {
+  font-size: 1.75rem;
+  font-weight: 750;
+  line-height: 1.2;
+  color: var(--text-color);
+  letter-spacing: -0.035em;
+} */
+
+/* 
+.app-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-color);
+  opacity: 0.68;
+} */
+
+/* Main application title */
+.app-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0;
+}
+
+/* Subtitle */
+.app-subtitle {
+  font-size: 1rem;
+  font-weight: 400;
+  color: #6b7280;
+  margin-top: 0.4rem;
+  margin-bottom: 0;
+}
+
+
+
+/* Fixed-width account area */
+
+.account-box {
+  text-align: center;
+  padding: 4px 0 8px;
+}
+
+.account-label {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 2px;
+}
+
+.account-user {
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* Keep the logout button compact */
+div[data-testid="stHorizontalBlock"] button[kind="secondary"] {
+  font-size: 0.85rem;
+}
+
+/* Consistent logout button */
+div[data-testid="stButton"]:has(button[key="logout_header"]) {
+  width: 100%;
+}
+
+div[data-testid="stButton"]:has(button[key="logout_header"]) button {
+  width: 100%;
+  min-height: 36px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.account-role {
+    font-size: 0.78rem;
+    color: #777;
+    margin-top: 2px;
+}
+
+/* .section-title {
+  font-size: 1.45rem;
+  font-weight: 700;
+  margin-top: 1.2rem;
+  margin-bottom: 0.8rem;
+  line-height: 1.2;
+} */
+
+/* Section headings */
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* .candidate-name {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.8rem;
+} */
+
+/* Selected candidate name */
+.candidate-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+
+
+/* Desktop: 4 cards in one row */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0.5rem 0 0.75rem;
+}
+
+.stat-card {
+  min-width: 0;
+  padding: 0.8rem 1rem;
+  background: var(--secondary-background-color);
+  border-radius: 8px;
+}
+
+.stat-value {
+  font-size: 1.7rem;
+  font-weight: 750;
+  line-height: 1.2;
+  color: var(--text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--text-color);
+  opacity: 0.7;
+}
+
+
+
+/* Responsive statistics cards */
+@media (max-width: 768px) {
+  /* Allow the metrics row to wrap on smaller screens */
+  div[data-testid="stHorizontalBlock"]:has(
+      div[data-testid="stMetric"]
+  ) {
+      flex-wrap: wrap !important;
+      gap: 0.5rem !important;
+  }
+
+  /* Two metric cards per row */
+  div[data-testid="stHorizontalBlock"]:has(
+      div[data-testid="stMetric"]
+  ) > div[data-testid="column"] {
+      flex: 0 0 calc(50% - 0.25rem) !important;
+      width: calc(50% - 0.25rem) !important;
+      min-width: 0 !important;
+  }
+
+  /* Compact card content */
+  div[data-testid="stMetric"] label {
+      font-size: 0.8rem !important;
+  }
+
+  div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+      font-size: 1.25rem !important;
+  }
+}
+
+
+
+/* fin styles.css */

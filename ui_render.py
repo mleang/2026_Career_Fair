@@ -1,6 +1,11 @@
 # ui_render.py
-import pathlib
+import html
 import streamlit as st
+import pathlib
+from pathlib import Path
+
+from audit_logger import log_auth_event
+
 
 def load_css(path: str = "assets/styles.css"):
     p = pathlib.Path(path)
@@ -23,23 +28,109 @@ def load_css(path: str = "assets/styles.css"):
         </style>
         """, unsafe_allow_html=True)
 
-def render_header(
-    title: str = "Career Fair",
-    subtitle: str = "Filtrer les candidats • Télécharger les CV • Suivre les décisions",
-    logo_path: str | None = None,
-    logo_width: int = 130,
-    badge_text: str | None = None,     # <- ajouté
-):
-    col1, col2 = st.columns([1.6, 5])
-    with col1:
-        if logo_path and pathlib.Path(logo_path).exists():
-            st.image(logo_path, width=logo_width)
-        else:
-            st.markdown("### 🎓")
-    with col2:
-        st.markdown(f'<h1 class="app-title">{title}</h1>', unsafe_allow_html=True)
-        if subtitle:
-            st.markdown(f'<p class="app-subtitle">{subtitle}</p>', unsafe_allow_html=True)
-        if badge_text:
-            st.markdown(f'<span class="badge">{badge_text}</span>', unsafe_allow_html=True)
-    st.markdown('<div class="hr-soft"></div>', unsafe_allow_html=True)
+# def render_header(
+#     title: str = "Career Fair",
+#     subtitle: str = "Filtrer les candidats • Télécharger les CV • Suivre les décisions",
+#     logo_path: str | None = None,
+#     logo_width: int = 130,
+#     badge_text: str | None = None,     # <- ajouté
+# ):
+#     col1, col2 = st.columns([1.6, 5])
+#     with col1:
+#         if logo_path and pathlib.Path(logo_path).exists():
+#             st.image(logo_path, width=logo_width)
+#         else:
+#             st.markdown("### 🎓")
+#     with col2:
+#         st.markdown(f'<h1 class="app-title">{title}</h1>', unsafe_allow_html=True)
+#         if subtitle:
+#             st.markdown(f'<p class="app-subtitle">{subtitle}</p>', unsafe_allow_html=True)
+#         if badge_text:
+#             st.markdown(f'<span class="badge">{badge_text}</span>', unsafe_allow_html=True)
+#     st.markdown('<div class="hr-soft"></div>', unsafe_allow_html=True)
+
+
+# =====================================
+# -------------- UI BOOT --------------
+# =====================================
+def configure_page(app_title: str, page_icon: str) -> None:
+    """Configure the Streamlit page and load custom CSS."""
+
+    st.set_page_config(
+        page_title=app_title,
+        page_icon=page_icon,
+        layout="wide",
+    )
+
+    css_path = pathlib.Path("assets/styles.css")
+
+    if css_path.exists():
+        st.markdown(
+            f"<style>{css_path.read_text(encoding='utf-8')}</style>",
+            unsafe_allow_html=True,
+        )
+
+# ======================================
+# ------------- HEADER -----------------
+# ======================================
+def render_header(logo_path: str, sponsor_name: str, username: str, recruiter_id: str, auth_log_path: str) -> None:
+    logo_col, title_col, account_col = st.columns(
+        [1.1, 5.2, 1.7],
+        vertical_alignment="center",
+    )
+
+    with logo_col:
+        try:
+            st.image(logo_path, width=140)
+        except Exception:
+            pass
+
+    with title_col:
+        st.markdown(
+            f"""
+            <div class="app-header">
+                <div class="app-title">{sponsor_name} Career Fair</div>
+                <div class="app-subtitle">
+                    Find candidates, review CVs and track outreach
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with account_col:
+        st.markdown(
+            f"""
+            <div class="account-box">
+                <div class="account-label"></div>
+                <div class="account-user"
+                    title="{html.escape(username, quote=True)}">
+                    Welcome {html.escape(recruiter_id)}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # Center the smaller logout button
+        _, logout_col, _ = st.columns([1, 2, 1])
+
+        with logout_col:
+            if st.button(
+                "↪ Log out",
+                key="logout_header",
+                use_container_width=True,
+            ):
+                log_auth_event(
+                    auth_log_path,
+                    username=username,
+                    event="logout",
+                    success=True,
+                )
+
+                for key in ("authenticated", "username", "recruiter_id"):
+                    st.session_state.pop(key, None)
+
+                st.rerun()
+
+    st.divider()

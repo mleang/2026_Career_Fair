@@ -41,3 +41,6 @@ downloaded_cvs/
 # Generate password file and ipynb
 generate_password.py
 get_reference_data.ipynb
+
+# test
+tests/

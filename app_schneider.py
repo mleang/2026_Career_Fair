@@ -27,11 +27,15 @@ from argon2.exceptions import (
 # ==============================================
 APP_TITLE  = "Schneider Electric Career Fair"
 PAGE_ICON  = "🎓"
-
-STATE_DBX_PATH = st.secrets.get("STATE_DBX_PATH_SCHNEIDER")
-DOODLE_URL = st.secrets["DOODLE_URL_SCHNEIDER"] if "DOODLE_URL_SCHNEIDER" in st.secrets else None
+SPONSOR_NAME_UPPER = "SCHNEIDER"
+SPONSOR_NAME_LOWER = SPONSOR_NAME_UPPER.lower()
+SPONSOR_NAME = "Schneider Electric"
+STATE_DBX_PATH = st.secrets.get(f"STATE_DBX_PATH_{SPONSOR_NAME_UPPER}")
+DOODLE_URL = st.secrets[f"DOODLE_URL_{SPONSOR_NAME_UPPER}"] if f"DOODLE_URL_{SPONSOR_NAME_UPPER}" in st.secrets else Non
+# STATE_DBX_PATH = st.secrets.get("STATE_DBX_PATH_SCHNEIDER")
+#DOODLE_URL = st.secrets["DOODLE_URL_SCHNEIDER"] if "DOODLE_URL_SCHNEIDER" in st.secrets else None
 CV_ROOT = "/CVs_2025"
-LOGO_PATH = "images/schneider.png"
+LOGO_PATH = "images/Logo-partenaires-SchneiderElectric_.png" #"images/schneider.png"
 
 
 # Auto-refresh (poll)
@@ -51,12 +55,12 @@ GRID_FILTER_KEY = "grid_filter_key"
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 
-AUTH_LOG = LOG_DIR / "auth_log_schneider.csv"
-ACTIVITY_LOG = LOG_DIR / "activity_log_schneider.csv"
+AUTH_LOG = LOG_DIR / f"auth_log_{SPONSOR_NAME_LOWER}.csv"
+ACTIVITY_LOG = LOG_DIR / f"activity_log_{SPONSOR_NAME_LOWER}.csv"
 DEBUG = False
 
 # Authentication
-ALLOWED_USERNAME = "schneider"
+ALLOWED_USERNAME = SPONSOR_NAME_LOWER
 
 
 
@@ -251,7 +255,7 @@ def render_login() -> bool:
     if st.session_state.get("authenticated", False):
         return True
 
-    st.title("Career Fair – Recruiter Login")
+    st.title(f"Hi! PARIS Career Fair 2026 – {SPONSOR_NAME} Login")
 
     with st.form("login_form"):
         username = st.text_input("Username")
@@ -361,7 +365,7 @@ if "authenticated" not in st.session_state:
 
 
 if not st.session_state.authenticated:
-    st.title("Career Fair – Recruiter Login")
+    st.title(f"Hi! PARIS Career Fair 2026 – {SPONSOR_NAME} Login")
     with st.form("login_form"):
         username = st.text_input("Username")
         password = st.text_input(
@@ -400,15 +404,15 @@ logo_col, title_col, account_col = st.columns(
 
 with logo_col:
     try:
-        st.image(LOGO_PATH, width=120)
+        st.image(LOGO_PATH, width=140)
     except Exception:
         pass
 
 with title_col:
     st.markdown(
-        """
+        f"""
         <div class="app-header">
-            <div class="app-title">Schneider Electric Career Fair</div>
+            <div class="app-title">{SPONSOR_NAME} Career Fair</div>
             <div class="app-subtitle">
                 Find candidates, review CVs and track outreach
             </div>

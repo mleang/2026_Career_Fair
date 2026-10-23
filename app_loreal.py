@@ -23,6 +23,21 @@ from merge_handler import _ensure_schema, _norm, _key, _build_delta_from_editor
 from merge_handler import _apply_optimistic, _compute_view_and_key, _flush_to_disk
 from merge_handler import _reset_grid, _handle_editor_change, _active_editor_key, _mark_dirty
 from merge_handler import _three_way_merge, _snapshot_base
+import logging
+from dropbox_storage import DROPBOX_TIMEOUT_SEC
+
+LOGS_DIR = Path(__file__).parent / "logs"
+LOGS_DIR.mkdir(exist_ok=True)
+
+logger = logging.getLogger(__name__)
+if not logger.hasHandlers():
+    handler = logging.FileHandler(LOGS_DIR / "app_loreal.log")
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    ))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
 
 # ==============================================
 # --------- CONFIGURATION SETTINGS  ------------
@@ -41,11 +56,11 @@ LOGO_PATH = "images/logo-partenaires-loreal-300x135.png" #"images/loreal.png"
 UTC = timezone.utc
 PARIS_TZ = ZoneInfo("Europe/Paris")
 ENABLE_REMOTE_POLL     = True    # active/désactive la détection des changements distants
-HASH_CHECK_TTL_SEC     = 3       # toutes les 3s on vérifie le hash Dropbox (léger)
+HASH_CHECK_TTL_SEC     = 1     # toutes les 1s on vérifie le hash Dropbox (léger)
 REFRESH_MS             = 1000 #2500    # cadence de refresh UI (2.5s) Poll approximately every 2 seconds
-AUTOSAVE_DEBOUNCE_SEC = 3.0
+AUTOSAVE_DEBOUNCE_SEC = 1.0
 MAX_SAVE_ATTEMPTS = 5
-DROPBOX_TIMEOUT_SEC = 5  # Timeout for Dropbox API calls in seconds
+# DROPBOX_TIMEOUT_SEC = 5  # Timeout for Dropbox API calls in seconds
 
 # UI keys
 EDITOR_KEY = "candidates_overview"
@@ -55,7 +70,7 @@ LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 AUTH_LOG = LOG_DIR / f"auth_log_{SPONSOR_NAME_LOWER}.csv"
 ACTIVITY_LOG = LOG_DIR / f"activity_log_{SPONSOR_NAME_LOWER}.csv"
-DEBUG = True # False
+DEBUG = False
 
 # Authentication
 ALLOWED_USERNAME = SPONSOR_NAME_LOWER
@@ -145,15 +160,26 @@ render_header(LOGO_PATH, SPONSOR_NAME, username, recruiter_id, AUTH_LOG)
 #     dbx_error = str(e)
 if "dbx" not in st.session_state:
     try:
-        st.session_state.dbx = _build_dbx_client()
+        st.session_state.dbx = _build_dbx_client() # ✅ Creates with timeout
         st.session_state.dbx_error = None
     except Exception as e:
         st.session_state.dbx = None
         st.session_state.dbx_error = str(e)
 
-DBX = st.session_state.dbx
+DBX = st.session_state.dbx  # ✅ Use cached client
 dbx_error = st.session_state.dbx_error
 
+# Initialize hash on first run
+if "last_seen_hash" not in st.session_state:
+    try:
+        initial_hash = _get_remote_hash(DBX, STATE_DBX_PATH)
+        st.session_state.last_seen_hash = initial_hash
+        st.session_state.last_hash_check = time.time()
+        logger.info(f"Initialized hash: {initial_hash[:16] if initial_hash else 'None'}...")
+    except Exception as e:
+        logger.warning(f"Failed to initialize hash: {e}")
+        st.session_state.last_seen_hash = None
+        st.session_state.last_hash_check = time.time()
 # =====================================
 # DEBUG show Dropbox token status in sidebar 
 # =====================================
@@ -213,7 +239,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-search_col, save_col, doodle_col = st.columns([3, 1, 1])
+# search_col, save_col, doodle_col = st.columns([3, 1, 1])
+search_col, save_col, refresh_col, doodle_col = st.columns([3, 1, 1, 1])
 
 # ------------------------------------------------------------
 # Candidate search + selection
@@ -254,6 +281,94 @@ with save_col:
         log_activity(ACTIVITY_LOG, "save_now_clicked")
         st.session_state["_want_save"] = True
 
+
+# ✅ NEW: Refresh Button ----------
+with refresh_col:
+    if st.button(
+        "🔄 Refresh",
+        key="refresh_top",
+        use_container_width=True,
+        help="Download latest data from Dropbox"
+    ):
+        logger.info("[MANUAL REFRESH] User clicked refresh button")
+        log_activity(ACTIVITY_LOG, "manual_refresh_clicked")
+        
+        try:
+            # Force download latest data
+            remote_df = _download_current_df_from_dbx(DBX, STATE_DBX_PATH)
+            
+            if remote_df is not None:
+                # Update remote hash first
+                rhash = _get_remote_hash(DBX, STATE_DBX_PATH)
+                
+                base_df = st.session_state.get("base_df")
+                ours_df = st.session_state.get("df")
+                
+                # 3-way merge
+                if base_df is None or ours_df is None:
+                    st.session_state.df = remote_df.copy(deep=True)
+                    st.session_state.base_df = remote_df.copy(deep=True)
+                    conflicts = []
+                    logger.info("[MANUAL REFRESH] No baseline - initialized from remote")
+                else:
+                    merged_df, conflicts = _three_way_merge(
+                        base_df,
+                        ours_df,
+                        remote_df,
+                        TEXT_COLS, 
+                        BOOL_COLS,
+                        FIRST, 
+                        LAST, 
+                        FILE
+                    )
+                    merged_df = _ensure_schema(
+                        merged_df, 
+                        TEXT_COLS, 
+                        BOOL_COLS, 
+                        FIRST, 
+                        LAST, 
+                        FILE
+                    )
+                    
+                    st.session_state.df = merged_df.copy(deep=True)
+                    st.session_state.base_df = merged_df.copy(deep=True)
+                    logger.info(f"[MANUAL REFRESH] Merged {len(merged_df)} rows, {len(conflicts)} conflicts")
+                
+                # Update hash and flags
+                st.session_state.last_seen_hash = rhash
+                st.session_state.last_hash_check = time.time()
+                st.session_state.remote_change_pending = False
+                
+                # Refresh grid display
+                view_df, filter_key = _compute_view_and_key(
+                    st.session_state.df,
+                    st.session_state.get("q", ""),
+                    FIRST, 
+                    LAST
+                )
+                _reset_grid(
+                    view_df, 
+                    filter_key, 
+                    EDITOR_KEY, 
+                    GRID_FILTER_KEY, 
+                    TEXT_COLS, 
+                    BOOL_COLS
+                )
+                
+                if conflicts:
+                    st.warning(
+                        f"ℹ️ {len(conflicts)} conflict(s) detected. "
+                        "Resolved in favor of local values."
+                    )
+                
+                logger.info("[MANUAL REFRESH] Refresh complete ✅")
+                st.toast("✅ Data refreshed!")
+                st.rerun()
+        
+        except Exception as e:
+            logger.error(f"[MANUAL REFRESH] Failed: {e}", exc_info=True)
+            st.error(f"❌ Refresh failed: {e}")
+            
 # ------------------------------------------------------------
 # Doodle
 # ------------------------------------------------------------
@@ -707,12 +822,12 @@ now = time.time()
 def autosave_status():
     now = time.time()
 
-    # ⚠️ Add this warning first
-    if st.session_state.get("remote_change_pending", False):
-        st.warning(
-            "⚠️ Another recruiter made changes while you were editing. "
-            "After you save, their changes will be merged in."
-        )
+    # # ⚠️ Add this warning first
+    # if st.session_state.get("remote_change_pending", False):
+    #     st.warning(
+    #         "⚠️ Another recruiter made changes while you were editing. "
+    #         "After you save, their changes will be merged in."
+    #     )
 
     if st.session_state.pop("_want_save", False):
         if st.session_state.get("buffer_dirty", False):
@@ -795,31 +910,129 @@ autosave_status()
 # Now define for main script
 now = time.time()
 if ENABLE_REMOTE_POLL:
-    # 1) Vérifie périodiquement le hash Dropbox (léger, pas de download)
+    # 1) Déclenche l’auto-refresh UI toutes REFRESH_MS ms (API stable)
+    try:
+        st.autorefresh(interval=REFRESH_MS, key="__poll_remote__")
+    except Exception:
+        # Compat anciennes versions de Streamlit
+        if hasattr(st, "experimental_autorefresh"):
+            st.experimental_autorefresh(interval=REFRESH_MS, key="__poll_remote__")
+
+
+    # 2) Vérifie périodiquement le hash Dropbox (léger, pas de download)
     should_check = (now - st.session_state["last_hash_check"]) >= HASH_CHECK_TTL_SEC
     if should_check:
-        rhash = _get_remote_hash(DBX, STATE_DBX_PATH, DROPBOX_TIMEOUT_SEC)
-        st.session_state["last_hash_check"] = now
+        rhash = _get_remote_hash(DBX, STATE_DBX_PATH)
+        last_seen = st.session_state.get("last_seen_hash")
+        
+        # ✅ ADD LOGGING
+        logger.debug(f"[HASH CHECK] Remote hash = {rhash[:16] if rhash else 'None'}")
+        logger.debug(f"[HASH CHECK] Last seen hash = {last_seen[:16] if last_seen else 'None'}")
+        logger.debug(f"[HASH CHECK] Match = {rhash == last_seen}")
+        
+        # Initialize on first run        
         if rhash and st.session_state["last_seen_hash"] is None:
             st.session_state["last_seen_hash"] = rhash
+            st.session_state.last_hash_check = now
+            logger.info("[HASH CHECK] Initialized last_seen_hash")
+        
+        # Detect remote change
         elif rhash and rhash != st.session_state["last_seen_hash"]:
+            logger.warning(f"[REMOTE CHANGE] Detected! {last_seen[:8]}... → {rhash[:8]}...")
+                
+            # If user is actively editing, just warn them
             # Remote file changed — check if we have local edits
             if st.session_state.get("buffer_dirty", False):
                 # ⚠️ Local edits in progress - User is actively editing — flag remote change, don't merge yet
                 st.session_state.remote_change_pending = True
+                logger.info("[REMOTE CHANGE] Set remote_change_pending=True (user editing)")
+            
             elif st.session_state.get("remote_change_pending", False):
                 # Already flagged pending from previous cycle — still waiting for user to save
+                logger.debug("[REMOTE CHANGE] Already pending from previous cycle")
                 pass
+        
+            # If user is NOT editing, merge automatically
             else:
+                logger.info("[REMOTE MERGE] Merging remote changes (no local edits)")
                 # ✅ Safe to merge: no local edits, no pending remote changes
                 # Un autre utilisateur a modifié le fichier → merge 3-voies
                 try:
+                    # Download latest remote version
                     # remote_df represents the CSV downloaded from Dropbox at that moment. It may become outdated immediately after downloading if another recruiter saves a change. It is therefore a snapshot, not a permanently current object.
                     remote_df = _download_current_df_from_dbx(DBX, STATE_DBX_PATH)
+                    if remote_df is not None:
+                            base_df = st.session_state.get("base_df")
+                            ours_df = st.session_state.get("df")
+                            
+                            if base_df is None or ours_df is None:
+                                # No baseline yet, just use remote
+                                st.session_state.df = remote_df.copy(deep=True)
+                                st.session_state.base_df = remote_df.copy(deep=True)
+                                logger.info("[REMOTE MERGE] No baseline - using remote as-is")
+                            else:
+                                # 3-way merge
+                                merged_df, conflicts = _three_way_merge(
+                                    base_df,
+                                    ours_df,
+                                    remote_df,
+                                    TEXT_COLS, 
+                                    BOOL_COLS,
+                                    FIRST, 
+                                    LAST, 
+                                    FILE
+                                )
+                                merged_df = _ensure_schema(
+                                    merged_df, 
+                                    TEXT_COLS, 
+                                    BOOL_COLS, 
+                                    FIRST, 
+                                    LAST, 
+                                    FILE
+                                )
+                                
+                                st.session_state.df = merged_df.copy(deep=True)
+                                st.session_state.base_df = merged_df.copy(deep=True)
+                                logger.info(f"[REMOTE MERGE] Merged {len(merged_df)} rows, {len(conflicts)} conflicts")
+                                
+                                if conflicts:
+                                    st.warning(
+                                        f"ℹ️ {len(conflicts)} conflict(s) detected in automatic merge. "
+                                        "Resolved in favor of local values."
+                                    )
+                            
+                            # ✅ Update remote hash AFTER successful merge
+                            st.session_state.last_seen_hash = rhash
+                            st.session_state.last_hash_check = now
+                            st.session_state.remote_change_pending = False
+                            
+                            # ✅ REFRESH THE GRID DISPLAY
+                            view_df, filter_key = _compute_view_and_key(
+                                st.session_state.df,
+                                st.session_state.get("q", ""),
+                                FIRST, 
+                                LAST
+                            )
+                            _reset_grid(
+                                view_df, 
+                                filter_key, 
+                                EDITOR_KEY, 
+                                GRID_FILTER_KEY, 
+                                TEXT_COLS, 
+                                BOOL_COLS
+                            )
+                            
+                            logger.info("[REMOTE MERGE] Grid refreshed ✅")
+                            st.toast("📥 Data refreshed from Dropbox")
+                            
+                            # ✅ RERUN TO SHOW THE NEW DATA
+                            st.rerun()
                 except Exception:
                     # remote_df = fetch_state_df()
                     #st.error("Unable to access the private Dropbox state.")
+                    logger.error(f"[REMOTE MERGE] Failed to download: {e}", exc_info=True)
                     remote_df = None
+                    st.warning(f"⚠️ Failed to merge remote changes: {e}")
                     st.error("Unable to refresh data right now.")
 
                 # if remote_df is not None:
@@ -852,6 +1065,7 @@ if ENABLE_REMOTE_POLL:
                         # Keep df and base_df unchanged.
                         # Do not acknowledge this remote version yet.
                         st.session_state.remote_change_pending = True
+                        logger.info("[REMOTE MERGE] Buffer became dirty, deferring merge")
 
                     else:
                         base_df = st.session_state.get("base_df")
@@ -884,6 +1098,8 @@ if ENABLE_REMOTE_POLL:
                         # Acknowledge only after applying the remote snapshot.
                         st.session_state["last_seen_hash"] = rhash
                         st.session_state.remote_change_pending = False
+                        logger.info(f"[REMOTE MERGE] Merge complete, conflicts={len(conflicts)}")
+
 
                         if conflicts:
                             st.warning(
@@ -901,15 +1117,19 @@ if ENABLE_REMOTE_POLL:
 
                         st.toast("Data refreshed from Dropbox.")
 
-    # 2) Déclenche l’auto-refresh UI toutes REFRESH_MS ms (API stable)
-    try:
-        st.autorefresh(interval=REFRESH_MS, key="__poll_remote__")
-    except Exception:
-        # Compat anciennes versions de Streamlit
-        if hasattr(st, "experimental_autorefresh"):
-            st.experimental_autorefresh(interval=REFRESH_MS, key="__poll_remote__")
-
-
+        
+        else:
+            # Hash matches, everything in sync
+            st.session_state.last_hash_check = now
+            logger.debug("[HASH CHECK] Hashes match - in sync ✅")
+                
+    # ✅ SHOW WARNING HERE (in main script, not fragment)
+    if st.session_state.get("remote_change_pending", False) and st.session_state.get("buffer_dirty", False):
+        st.warning(
+            "⚠️ Another recruiter made changes while you were editing. "
+            "After you save, their changes will be merged in."
+        )
+        
 st.divider()
 
 # ============================================================

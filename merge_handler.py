@@ -4,6 +4,9 @@ import unicodedata
 import dropbox
 import pandas as pd
 import streamlit as st
+import logging
+import requests
+
 
 from audit_logger import log_activity
 
@@ -17,7 +20,8 @@ from audit_logger import log_activity
 # _build_delta_from_editor()	Extract changes made in the Streamlit editor relative to the baseline.
 # _flush_to_disk()	Coordinate saving: fetch latest data, merge edits, and persist the reconciled result.
 
-
+from logging_config import setup_logging
+logger = setup_logging("merge_handler")
 # ---------------- Helpers ----------------
 def _norm(value: str) -> str:
     """Normalize text for search/comparison."""
@@ -390,8 +394,7 @@ def _flush_to_disk(
     file: str,
     ok_text="Changes saved.",
     err_text="Could not save changes.",
-    max_attempts=4,
-    
+    max_attempts=4,    
 ):
     """Save local changes using a three-way merge and conditional Dropbox write."""
 
@@ -460,11 +463,25 @@ def _flush_to_disk(
             st.session_state.base_df = merged_df.copy(deep=True)
             st.session_state.buffer_dirty = False
             st.session_state.last_batch_write = time.time()
-            st.session_state.last_seen_hash = getattr(
-                uploaded_metadata, "content_hash", None
-            )
+            
+            # Update remote hash
+            # st.session_state.last_seen_hash = getattr(
+            #     uploaded_metadata, "content_hash", None
+            # )
+            # ✅ CRITICAL: Update hash IMMEDIATELY after successful upload
+            # This prevents the warning from showing again on next check
+            new_hash = getattr(uploaded_metadata, "content_hash", None)
+            st.session_state.last_seen_hash = new_hash
             st.session_state.last_hash_check = time.time()
-
+            
+            logger.info(f"Updated hash after save: {new_hash[:8] if new_hash else 'None'}...")
+            logger.info(f"Updated last_hash_check to {time.time()}")
+            
+            # ✅ CLEAR THE FLAG
+            st.session_state.remote_change_pending = False
+            logger.info(f"[SAVE SUCCESS] Updated hash = {new_hash[:16] if new_hash else 'None'}")
+            logger.info(f"[SAVE SUCCESS] Cleared remote_change_pending")
+        
             # Force a fresh editor widget on the next rerun.
             st.session_state.editor_generation = (
                 st.session_state.get("editor_generation", 0) + 1
@@ -475,7 +492,11 @@ def _flush_to_disk(
             # Show save time
             save_duration = time.time() - start_time
             st.toast(f"{ok_text} ({save_duration:.1f}s)")
-            #st.toast(ok_text)
+            
+            # ✅ RERUN TO APPLY THE UPDATED HASH
+            logger.info(f"Successfully saved to {state_dbx_path}")
+            st.rerun()
+
             return True
 
         except Exception as exc:
@@ -499,6 +520,18 @@ def _download_latest_for_save(dbx: dropbox.Dropbox, state_dbx_path: str, text_co
     from the same Dropbox download operation.
 
     Do not decorate this function with st.cache_data.
+    
+    Args:
+        dbx: Dropbox client
+        state_dbx_path: Path to CSV file in Dropbox
+        text_cols, bool_cols: Column schemas
+        timeout: API call timeout in seconds
+        
+    Returns:
+        (remote_df, revision_hash)
+        
+    Raises:
+        RuntimeError: If download or parse fails
     """
     #global DBX
 
@@ -506,13 +539,50 @@ def _download_latest_for_save(dbx: dropbox.Dropbox, state_dbx_path: str, text_co
         raise RuntimeError("Dropbox client is not initialized.")
 
     try:
+        logger.debug(f"Downloading latest from {state_dbx_path}")
         metadata, response = dbx.files_download(state_dbx_path)
+    
+    except requests.exceptions.Timeout as exc:
+        logger.warning(f"Download timeout after 10 s")
+        raise RuntimeError(
+            f"Download timed out after 10s. "
+            "Dropbox server is slow. Retrying..."
+        ) from exc
 
-    except dropbox.exceptions.AuthError:
+    except dropbox.exceptions.AuthError as exc:
+        logger.error(f"Auth failed downloading {state_dbx_path}: {exc}")
         #DBX = _refresh_dbx_client()
         #metadata, response = dbx.files_download(state_dbx_path)
-        raise RuntimeError("Dropbox authentication failed. Please check your credentials.")
+        #raise RuntimeError("Dropbox authentication failed. Please check your credentials.")
+        raise RuntimeError(
+            "Dropbox authentication failed. "
+            "Please re-authenticate and try again."
+        ) from exc
     
+    except dropbox.exceptions.ApiError as exc:
+        error_msg = str(exc).lower()
+        logger.error(f"API error downloading {state_dbx_path}: {exc}")
+        
+        if "not_found" in error_msg:
+            raise RuntimeError(
+                f"CSV file not found at {state_dbx_path}. "
+                "Check that the path is correct."
+            ) from exc
+        
+        elif "permission_denied" in error_msg:
+            raise RuntimeError(
+                "Permission denied: unable to access the CSV file. "
+                "Check Dropbox sharing settings."
+            ) from exc
+        
+        else:
+            raise RuntimeError(f"Dropbox API error: {exc}") from exc
+    
+    except Exception as exc:
+        logger.error(f"Unexpected error downloading {state_dbx_path}: {exc}", exc_info=True)
+        raise RuntimeError(f"Unexpected error downloading CSV: {exc}") from exc
+    
+    # Parse CSV with robust error handling
     try:
         # ✅ on_bad_lines='skip' to handle corrupted rows
         remote_df = pd.read_csv(
@@ -521,9 +591,13 @@ def _download_latest_for_save(dbx: dropbox.Dropbox, state_dbx_path: str, text_co
             on_bad_lines='skip',  # Skip rows with parsing errors
             engine='python',       # Use python engine for on_bad_lines
         )
+        if remote_df.empty:
+            logger.warning(f"Remote CSV at {state_dbx_path} is empty")
     except pd.errors.ParserError as exc:
+        logger.error(f"CSV parse error in {state_dbx_path}: {exc}")
         raise RuntimeError(f"Failed to parse remote CSV: {exc}") from exc
     except Exception as exc:
+        logger.error(f"Unexpected error reading CSV: {exc}", exc_info=True)
         raise RuntimeError(f"Unexpected error reading remote CSV: {exc}") from exc
 
     remote_df = _ensure_schema(remote_df, text_cols, bool_cols, first, last, file)
@@ -533,7 +607,7 @@ def _download_latest_for_save(dbx: dropbox.Dropbox, state_dbx_path: str, text_co
 #------------------------------------------------
 # Upload only if the revision is still current
 #------------------------------------------------
-def _upload_if_revision_matches(csv_bytes: bytes, expected_rev: str, dbx: dropbox.Dropbox, state_dbx_path: str):
+def _upload_if_revision_matches(csv_bytes: bytes, expected_rev: str, dbx: dropbox.Dropbox, state_dbx_path: str) -> dropbox.files.FileMetadata:
     """
     Upload only if the Dropbox file still has expected_rev.
 
@@ -546,6 +620,8 @@ def _upload_if_revision_matches(csv_bytes: bytes, expected_rev: str, dbx: dropbo
         raise RuntimeError("Dropbox client is not initialized.")
 
     try:
+        logger.debug(f"Uploading {len(csv_bytes)} bytes to {state_dbx_path} (expected rev: {expected_rev[:8]}...)")
+        
         return dbx.files_upload(
             csv_bytes,
             state_dbx_path,
@@ -553,16 +629,60 @@ def _upload_if_revision_matches(csv_bytes: bytes, expected_rev: str, dbx: dropbo
             mute=True,
         )
 
-    except dropbox.exceptions.AuthError:
-        # dbx = _refresh_dbx_client()
-        # Don't try to refresh here - let the caller handle retries
-        raise
+    except requests.exceptions.Timeout as exc:
+        # Network timeout
+        logger.error(f"Upload timeout after 10s: {exc}")
+        raise RuntimeError(
+            f"Upload timed out after 10s. "
+            "Dropbox server is slow or unreachable. "
+            "Your changes are retained; please try again."
+        ) from exc
 
-        # Keep the same expected revision after token refresh.
-        # If the file changed in the meantime, this must fail safely.
-        # return dbx.files_upload(
-        #     csv_bytes,
-        #     state_dbx_path,
-        #     mode=dropbox.files.WriteMode.update(expected_rev),
-        #     mute=True,
-        # )
+    except dropbox.exceptions.AuthError as exc:
+        # Authentication failure
+        logger.error(f"Auth failed during upload: {exc}")
+        raise RuntimeError(
+            "Dropbox authentication failed. "
+            "Please re-authenticate and try again."
+        ) from exc
+
+    except dropbox.exceptions.ApiError as exc:
+        # Other API errors (including revision conflicts, permission denied, etc.)
+        error_msg = str(exc).lower()
+        logger.error(f"Dropbox API error during upload: {exc}")
+        
+        if "conflict" in error_msg or "incorrect_revision" in error_msg or "revision mismatch" in error_msg:
+            # Revision conflict — caller will retry with fresh data
+            logger.debug("Revision conflict detected; will retry with latest remote version")
+            raise  # ← Re-raise for caller to handle retry
+        
+        elif "permission_denied" in error_msg:
+            raise RuntimeError(
+                "Permission denied: unable to write to the CSV file. "
+                "Check Dropbox sharing settings."
+            ) from exc
+        
+        elif "path_disallowed" in error_msg:
+            raise RuntimeError(
+                f"Path not allowed: {state_dbx_path} "
+                "Check Dropbox app permissions."
+            ) from exc
+        
+        elif "rate_limit" in error_msg:
+            raise RuntimeError(
+                "Rate limited by Dropbox. "
+                "Please try again in a few moments."
+            ) from exc
+        
+        else:
+            # Generic API error
+            raise RuntimeError(
+                f"Dropbox API error during upload: {exc}"
+            ) from exc
+
+    except Exception as exc:
+        # Unexpected errors
+        logger.error(f"Unexpected error during upload: {exc}", exc_info=True)
+        raise RuntimeError(
+            f"Unexpected error uploading to Dropbox: {exc}"
+        ) from exc

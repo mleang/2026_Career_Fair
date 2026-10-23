@@ -6,8 +6,12 @@ import time
 import pandas as pd
 from pathlib import Path, PurePosixPath
 import base64
+import logging
 
 from merge_handler import _ensure_schema
+from logging_config import setup_logging
+
+logger = setup_logging("dropbox_storage")
 
 # _access_token_from_refresh()	Obtain a Dropbox access token using the refresh token.
 # _build_dbx_client()	Create an authenticated Dropbox client.
@@ -21,6 +25,10 @@ from merge_handler import _ensure_schema
 
 # Dropbox client, fresh downloads,
 # revisions, conditional writes, and retries.
+# ============================================================
+# DROPBOX TIMEOUTS
+# ============================================================
+DROPBOX_TIMEOUT_SEC = 5  # Global timeout for all Dropbox API calls
 
 # ============================================================
 # DROPBOX CLIENT
@@ -39,20 +47,31 @@ def _access_token_from_refresh() -> str | None:
     if not all(key in secrets for key in required):
         return None
 
-    response = requests.post(
-        "https://api.dropbox.com/oauth2/token",
-        data={
-            "refresh_token": secrets["DROPBOX_REFRESH_TOKEN"],
-            "grant_type": "refresh_token",
-            "client_id": secrets["DROPBOX_APP_KEY"],
-            "client_secret": secrets["DROPBOX_APP_SECRET"],
-        },
-        timeout=15,
-    )
+    try:
+        response = requests.post(
+            "https://api.dropbox.com/oauth2/token",
+            data={
+                "refresh_token": secrets["DROPBOX_REFRESH_TOKEN"],
+                "grant_type": "refresh_token",
+                "client_id": secrets["DROPBOX_APP_KEY"],
+                "client_secret": secrets["DROPBOX_APP_SECRET"],
+            },
+            timeout=15, # Token refresh timeout
+        )
 
-    response.raise_for_status()
+        response.raise_for_status()
 
-    return response.json()["access_token"]
+        return response.json()["access_token"]
+ 
+    except requests.exceptions.Timeout as exc:
+        raise RuntimeError(
+            "Token refresh timed out. Dropbox auth server is slow."
+        ) from exc
+    
+    except requests.exceptions.RequestException as exc:
+        raise RuntimeError(
+            f"Failed to refresh token: {exc}"
+        ) from exc
 
 
 @st.cache_resource(show_spinner=False)
@@ -74,7 +93,7 @@ def _build_dbx_client() -> dropbox.Dropbox:
             "DROPBOX_REFRESH_TOKEN."
         )
 
-    return dropbox.Dropbox(token)
+    return dropbox.Dropbox(token, timeout=DROPBOX_TIMEOUT_SEC)
 
 
 def _refresh_dbx_client() -> dropbox.Dropbox:
@@ -83,7 +102,7 @@ def _refresh_dbx_client() -> dropbox.Dropbox:
     token = _access_token_from_refresh()
 
     if token:
-        return dropbox.Dropbox(token)
+        return dropbox.Dropbox(token, timeout=DROPBOX_TIMEOUT_SEC)
 
     return _build_dbx_client()
 
@@ -173,13 +192,13 @@ def _dbx_call(fn, dbx: dropbox.Dropbox, retries: int = 3):
 
 # -------- Remote hash (léger) pour auto-refresh --------
 @st.cache_data(show_spinner=False, ttl=1)
-def _get_remote_hash(_dbx: dropbox.Dropbox, state_dbx_path: str, timeout=10) -> str | None:
+def _get_remote_hash(_dbx: dropbox.Dropbox, state_dbx_path: str) -> str | None:
     """Retourne content_hash du fichier côté Dropbox (sans télécharger le CSV)."""
     if _dbx is None:
         return None
     try:
         # Apply timeout to the Dropbox API call
-        md = _dbx.files_get_metadata(state_dbx_path, timeout=timeout)
+        md = _dbx.files_get_metadata(state_dbx_path)
         # md peut être FileMetadata avec .content_hash
         if hasattr(md, "content_hash"):
             return md.content_hash

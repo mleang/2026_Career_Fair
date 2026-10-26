@@ -1,4 +1,5 @@
 # ui_render.py
+import base64
 import html
 import streamlit as st
 import pathlib
@@ -81,7 +82,26 @@ def render_header(logo_path: str, sponsor_name: str, username: str, recruiter_id
 
     with logo_col:
         try:
-            st.image(logo_path, width=140)
+            # On vérifie si c'est un SVG
+            if logo_path.lower().endswith('.svg'):
+                # 1. Lire le fichier SVG local
+                svg_string = Path(logo_path).read_text(encoding="utf-8")
+
+                # 2. L'encoder en Base64 pour contourner les restrictions
+                b64 = base64.b64encode(svg_string.encode("utf-8")).decode(
+                    "utf-8"
+                )
+
+                # 3. L'injecter de manière sécurisée avec une taille fixée à 140px
+                html_code = f"""
+                    <div style="display: flex; justify-content: center; align-items: center; width: 140px;">
+                        <img src="data:image/svg+xml;base64,{b64}" style="width: 140px; height: auto;" />
+                    </div>
+                """
+                st.markdown(html_code, unsafe_allow_html=True)
+            else:
+                # Sécurité pour les logos PNG / JPG classiques
+                st.image(logo_path, width=140)
         except Exception:
             pass
 
@@ -105,7 +125,7 @@ def render_header(logo_path: str, sponsor_name: str, username: str, recruiter_id
                 <div class="account-label"></div>
                 <div class="account-user"
                     title="{html.escape(username, quote=True)}">
-                    Welcome {html.escape(recruiter_id)}
+                    Welcome {html.escape(sponsor_name)}
                 </div>
             </div>
             """,

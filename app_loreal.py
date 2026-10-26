@@ -1,18 +1,10 @@
-import base64
-import io
-import pathlib
 import time
-import unicodedata
-from pathlib import Path, PurePosixPath
-from datetime import datetime, timezone
+from pathlib import Path
+from datetime import timezone
 from zoneinfo import ZoneInfo
-
-import dropbox
 import pandas as pd
 import streamlit as st
-import requests
 import html
-import uuid
 
 # from streamlit_autorefresh import st_autorefresh
 from ui_render import configure_page, render_header
@@ -26,31 +18,17 @@ from merge_handler import _three_way_merge, _snapshot_base
 import logging
 from dropbox_storage import DROPBOX_TIMEOUT_SEC
 
-LOGS_DIR = Path(__file__).parent / "logs"
-LOGS_DIR.mkdir(exist_ok=True)
-
-logger = logging.getLogger(__name__)
-if not logger.hasHandlers():
-    handler = logging.FileHandler(LOGS_DIR / "app_loreal.log")
-    handler.setFormatter(logging.Formatter(
-        "%(asctime)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    ))
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
-
 # ==============================================
 # --------- CONFIGURATION SETTINGS  ------------
 # ==============================================
-APP_TITLE  = "L'Oréal Career Fair"
-PAGE_ICON  = "🎓"
 SPONSOR_NAME_UPPER = "LOREAL"
 SPONSOR_NAME_LOWER = SPONSOR_NAME_UPPER.lower()
 SPONSOR_NAME = "L'Oréal"
+APP_TITLE  = f"{SPONSOR_NAME} Career Fair"
+PAGE_ICON  = "🎓"
 STATE_DBX_PATH = st.secrets.get(f"STATE_DBX_PATH_{SPONSOR_NAME_UPPER}")
 DOODLE_URL = st.secrets[f"DOODLE_URL_EDITOR_{SPONSOR_NAME_UPPER}"] if f"DOODLE_URL_EDITOR_{SPONSOR_NAME_UPPER}" in st.secrets else None
-CV_ROOT = "/CVs_2025"
-LOGO_PATH = "images/logo-partenaires-loreal-300x135.png" #"images/loreal.png"
+LOGO_PATH = "images/logo_loreal.jpg"
 
 # Auto-refresh (poll)
 UTC = timezone.utc
@@ -60,12 +38,12 @@ HASH_CHECK_TTL_SEC     = 1     # toutes les 1s on vérifie le hash Dropbox (lég
 REFRESH_MS             = 1000 #2500    # cadence de refresh UI (2.5s) Poll approximately every 2 seconds
 AUTOSAVE_DEBOUNCE_SEC = 1.0
 MAX_SAVE_ATTEMPTS = 5
-# DROPBOX_TIMEOUT_SEC = 5  # Timeout for Dropbox API calls in seconds
 
 # UI keys
 EDITOR_KEY = "candidates_overview"
 GRID_FILTER_KEY = "grid_filter_key"
 
+# Logging for authentication and activity
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 AUTH_LOG = LOG_DIR / f"auth_log_{SPONSOR_NAME_LOWER}.csv"
@@ -75,16 +53,23 @@ DEBUG = False
 # Authentication
 ALLOWED_USERNAME = SPONSOR_NAME_LOWER
 
+# Logging setup 
+LOGS_DIR = Path(__file__).parent / "logs"
+LOGS_DIR.mkdir(exist_ok=True)
+
+logger = logging.getLogger(__name__)
+if not logger.hasHandlers():
+    handler = logging.FileHandler(LOGS_DIR / f"app_{SPONSOR_NAME_LOWER}.log")
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    ))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+
 # =====================================
 # ------------ DATA SCHEMA ------------
 # =====================================
-
-# Dropbox
-# CSV
-# candidate data
-# UI
-# etc.
-
 # ---------------- Columns ----------------
 FIRST, LAST, FILE = "first_name", "last_name", "file_name"   # FILE is a full URL
 SEEN, INT, SAVE, CONT = "seen", "intend_view", "cv_saved", "contacted"
@@ -109,38 +94,10 @@ ALL_COLS = [
 
 
 configure_page(APP_TITLE, PAGE_ICON)
+
 # =====================================
 # AUTHENTICATION
 # =====================================
-# if "authenticated" not in st.session_state:
-#     st.session_state.authenticated = False
-
-# if not st.session_state.authenticated:
-#     st.title(f"Hi! PARIS Career Fair 2026 – {SPONSOR_NAME} Login")
-#     with st.form("login_form"):
-#         username = st.text_input("Username")
-#         password = st.text_input(
-#             "Password",
-#             type="password"
-#         )
-
-#         submitted = st.form_submit_button(
-#             "🔐 Sign in",
-#             type="primary"
-#         )
-
-#         if submitted:
-#             recruiter_id = authenticate(username, password)
-#             if recruiter_id is None:
-#                 st.error("Invalid username or password.")
-#             else:
-#                 # Store the authenticated session
-#                 st.session_state.authenticated = True
-#                 st.session_state.username = username.strip().lower()
-#                 st.session_state.recruiter_id = recruiter_id
-#                 st.rerun()
-#     st.stop() # prevents the rest of the script from running for unauthenticated users.
-
 authenticate(st.session_state.get("username", ""), st.session_state.get("password", ""), ALLOWED_USERNAME, AUTH_LOG)
 render_login(SPONSOR_NAME, ALLOWED_USERNAME, AUTH_LOG)
 username = st.session_state.username
@@ -152,12 +109,6 @@ recruiter_id = st.session_state.recruiter_id
 render_header(LOGO_PATH, SPONSOR_NAME, username, recruiter_id, AUTH_LOG)
 
 # --- Dropbox auth (access token OR refresh token) ---
-# DBX = None
-# dbx_error = None
-# try:
-#     DBX = _build_dbx_client()
-# except Exception as e:
-#     dbx_error = str(e)
 if "dbx" not in st.session_state:
     try:
         st.session_state.dbx = _build_dbx_client() # ✅ Creates with timeout
@@ -180,6 +131,7 @@ if "last_seen_hash" not in st.session_state:
         logger.warning(f"Failed to initialize hash: {e}")
         st.session_state.last_seen_hash = None
         st.session_state.last_hash_check = time.time()
+
 # =====================================
 # DEBUG show Dropbox token status in sidebar 
 # =====================================
@@ -239,7 +191,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# search_col, save_col, doodle_col = st.columns([3, 1, 1])
 search_col, save_col, refresh_col, doodle_col = st.columns([3, 1, 1, 1])
 
 # ------------------------------------------------------------
@@ -282,7 +233,7 @@ with save_col:
         st.session_state["_want_save"] = True
 
 
-# ✅ NEW: Refresh Button ----------
+# ✅ Refresh Button ----
 with refresh_col:
     if st.button(
         "🔄 Refresh",
@@ -383,7 +334,6 @@ with doodle_col:
 filter_active = bool(
     st.session_state.q.strip()
 )
- 
     
 # ---- Flush when toggling filter state (keep only B) ----
 # B) filter -> no filter : matérialiser les deltas en mémoire du widget puis flush
@@ -514,12 +464,8 @@ def _toggle_candidate(row_key: str, col: str) -> None:
         BOOL_COLS
     )
 
-    # The overview will be rebuilt from the updated full dataframe
-    # on the next Streamlit rerun.
-    # st.session_state.pop(EDITOR_KEY, None)
-    # st.session_state.pop("editor_logged_changes", None)
 
-# grid = st.session_state.grid_df
+
 grid = st.session_state.df.copy()  # st.session_state.df : Current working data
 row_keys = _key(grid, FIRST, LAST, FILE).tolist()
 label_of = dict(zip(row_keys, (grid[FIRST].astype(str) + " " + grid[LAST].astype(str)).tolist()))
@@ -527,7 +473,7 @@ label_of = dict(zip(row_keys, (grid[FIRST].astype(str) + " " + grid[LAST].astype
 # ============================================================
 # CANDIDATE
 # ============================================================
-#Candidate Search & Selection: Recruiters can search/select candidates using a dropdown 
+# Candidate Search & Selection: Recruiters can search/select candidates using a dropdown 
 # or filter by status (Viewed, Interested, Saved, Contacted).
 if sel is None:
 
@@ -667,22 +613,6 @@ elif status_filter == "Contacted":
 else:
     filtered_df = df.copy()
 
-# Keep the selection even when a status filter excludes that candidate.
-# sel = st.session_state.get("candidate_search")
-# if sel is not None:
-#     overview_df = filtered_df.loc[_key(filtered_df, FIRST, LAST, FILE).eq(sel)].copy()
-#     if overview_df.empty:
-#         st.caption(
-#             "The selected candidate does not match the current status filter."
-#         )
-#     else:
-#         st.caption(
-#             f"Showing selected candidate: "
-#             f"{overview_df.iloc[0][FIRST]} {overview_df.iloc[0][LAST]}"
-#         )
-# else:
-#     overview_df = filtered_df.copy()
-#     st.caption(f"Showing {len(overview_df)} candidates")
 # Selection is optional - just show selected candidate if they exist
 sel = st.session_state.get("candidate_search")
 if sel is not None:
@@ -732,102 +662,12 @@ st.data_editor(
     num_rows="fixed",
 )
 
-
-
-# # ---------------- Read changes from editor state (no DataFrame diff) ----------------
-# ed_state = st.session_state.get(EDITOR_KEY, {})
-# edited_rows = ed_state.get("edited_rows", {})  # {row_idx: {col: new_val, ...}}
-
-# delta_df = _build_delta_from_editor(st.session_state.grid_df, edited_rows)
-
-# # ---------------- Apply edits (optimistic), no buffer/debounce ----------------
-# now = time.time()
-# if not delta_df.empty:
-#     st.session_state.df = _apply_optimistic(st.session_state.df, delta_df)
-
-
-
 # ---------------- Autosave ----------------
-# now = time.time()
-
-# if st.session_state.get("buffer_dirty", False):
-#     st.warning("Changes pending — saving shortly.")
-
-#     last_edit_at = st.session_state.get("last_edit_at", now)
-
-#     if now - last_edit_at >= AUTOSAVE_DEBOUNCE_SEC:
-#         _flush_to_disk()
-
-# else:
-#     st.caption("All changes saved.")
-
-# now = time.time()
-
-# if st.session_state.pop("_want_save", False):
-#     if st.session_state.get("buffer_dirty", False):
-#         # Bypass the debounce for an explicit user request.
-#         st.session_state.last_edit_at = 0.0
-#         _flush_to_disk(DBX, STATE_DBX_PATH, TEXT_COLS, BOOL_COLS, FIRST, LAST, FILE, "Saved ✅", "Save failed")
-#     else:
-#         st.info("No unsaved changes.")
-
-# # elif st.session_state.get("buffer_dirty", False):
-# #     last_edit_at = st.session_state.get("last_edit_at")
-
-# #     if (
-# #         last_edit_at is not None
-# #         and now - last_edit_at >= AUTOSAVE_DEBOUNCE_SEC
-# #     ):
-# #         _flush_to_disk(DBX, STATE_DBX_PATH, TEXT_COLS, BOOL_COLS, FIRST, LAST, FILE, "Saved ✅", "Auto-save failed")
-# #         st.session_state.buffer_dirty = False  # clear the flag
-# #     else:
-# #         st.caption("Changes pending — saving shortly.")
-
-# # else:
-# #     st.caption("All changes saved.")
-# elif st.session_state.get("buffer_dirty", False):
-#     last_edit_at = st.session_state.get("last_edit_at")
-
-#     if last_edit_at is None:
-#         # First time buffer was marked dirty, initialize the timer
-#         st.session_state.last_edit_at = now
-#         st.caption(f"⏳ Changes pending — saving in {AUTOSAVE_DEBOUNCE_SEC:.1f}s...")
-#     else:
-#         time_since_edit = now - last_edit_at 
-#         remaining_wait = AUTOSAVE_DEBOUNCE_SEC - time_since_edit
-
-#         if time_since_edit >= AUTOSAVE_DEBOUNCE_SEC:
-#             # Ready to save
-#             st.caption("💾 Saving...")
-#             save_start = time.time()
-#             success = _flush_to_disk(DBX, STATE_DBX_PATH, TEXT_COLS, BOOL_COLS, FIRST, LAST, FILE, "Saved ✅", "Auto-save failed")
-#             save_duration = time.time() - save_start
-            
-#             # After flush, check actual state
-#             if success and not st.session_state.get("buffer_dirty"):  # Check if save succeeded
-#                 st.caption(f"✅ Saved in {save_duration:.1f}s")
-#             elif not success: 
-#                 st.caption(f"❌ Save failed (will retry in {AUTOSAVE_DEBOUNCE_SEC}s)")
-    
-#         else:
-#             # Still waiting for debounce
-#             st.caption(f"⏳ Changes pending — saving in {remaining_wait:.1f}s...")
-# else:
-#     st.caption("✅ All changes saved")
-
-
 now = time.time()
 
 @st.fragment(run_every=0.5)
 def autosave_status():
     now = time.time()
-
-    # # ⚠️ Add this warning first
-    # if st.session_state.get("remote_change_pending", False):
-    #     st.warning(
-    #         "⚠️ Another recruiter made changes while you were editing. "
-    #         "After you save, their changes will be merged in."
-    #     )
 
     if st.session_state.pop("_want_save", False):
         if st.session_state.get("buffer_dirty", False):
@@ -879,33 +719,6 @@ def autosave_status():
 
 autosave_status()
 
-# if st.session_state.get("buffer_dirty", False):
-#     last_edit_at = st.session_state.get("last_edit_at", now)
-
-#     if now - last_edit_at >= AUTOSAVE_DEBOUNCE_SEC:
-#         _flush_to_disk("Saved ✅", "Auto-save failed")
-#     else:
-#         st.caption("Changes pending — saving shortly.")
-# else:
-#     st.caption("All changes saved.")
-
-# # Explicit Save button: force a save attempt.
-# if st.session_state.pop("_want_save", False):
-#     # Make sure the debounce does not prevent a manual save.
-#     st.session_state.buffer_dirty = True
-#     st.session_state.last_edit_at = 0.0
-
-#     _flush_to_disk("Saved ✅", "Save failed")
-  
-# Traitement du bouton Save now
-# if st.session_state.pop("_want_save", False):
-#     _flush_to_disk("Saved ✅", "Save failed")
-
-# ---------------- Auto-save périodique (toutes les 5s) ----------------
-# if (now - st.session_state["last_auto_save"]) >= 5:
-#     _flush_to_disk("Saved ✅", "Auto-save failed")
-#     st.session_state["last_auto_save"] = now
-
 # ---------------- Auto-refresh (poll hash) ----------------
 # Now define for main script
 now = time.time()
@@ -917,7 +730,6 @@ if ENABLE_REMOTE_POLL:
         # Compat anciennes versions de Streamlit
         if hasattr(st, "experimental_autorefresh"):
             st.experimental_autorefresh(interval=REFRESH_MS, key="__poll_remote__")
-
 
     # 2) Vérifie périodiquement le hash Dropbox (léger, pas de download)
     should_check = (now - st.session_state["last_hash_check"]) >= HASH_CHECK_TTL_SEC
@@ -1027,38 +839,13 @@ if ENABLE_REMOTE_POLL:
                             
                             # ✅ RERUN TO SHOW THE NEW DATA
                             st.rerun()
+
                 except Exception:
-                    # remote_df = fetch_state_df()
-                    #st.error("Unable to access the private Dropbox state.")
                     logger.error(f"[REMOTE MERGE] Failed to download: {e}", exc_info=True)
                     remote_df = None
                     st.warning(f"⚠️ Failed to merge remote changes: {e}")
                     st.error("Unable to refresh data right now.")
 
-                # if remote_df is not None:
-                #     base_df = st.session_state.get("base_df", remote_df.copy())
-                #     ours_df = st.session_state.df.copy(deep=True)
-
-                #     merged, conflicts = _three_way_merge(base_df, ours_df, remote_df)
-                #     if conflicts:
-                #         st.warning(
-                #             f"{len(conflicts)} conflict(s) detected while merging. "
-                #             "Please check the merged data."
-                #         )
-
-                #     st.session_state.df = merged
-                #     _snapshot_base()
-                #     st.session_state["last_seen_hash"] = rhash
-
-                #     # Rebuild grid sans changer le filtre
-                #     base_df_for_view = st.session_state.df
-                #     view_df, current_filter_key = _compute_view_and_key(base_df_for_view, st.session_state.q)
-                #     _reset_grid(view_df, current_filter_key)
-
-                #     msg = "Données mises à jour depuis Dropbox 🔄 (merge appliqué)"
-                #     if conflicts:
-                #         msg += f" • {len(conflicts)} conflit(s) résolu(s)"
-                #     st.toast(msg)
 
                 if remote_df is not None:
                     if st.session_state.get("buffer_dirty", False):
@@ -1139,8 +926,7 @@ st.markdown(
     '<div class="section-title">📊 Candidates tracking</div>',
     unsafe_allow_html=True,
 )
-# st.caption("Track your progress and quickly find candidates to follow up with.")
-# df = st.session_state.df
+
 if "status_filter" not in st.session_state:
     st.session_state.status_filter = "All"
 
@@ -1189,7 +975,6 @@ if "status_filter" not in st.session_state:
 def on_status_filter_change():
     # Clear the selected candidate when filter changes
     st.session_state.candidate_search = None
-    # editor_key = _active_editor_key(EDITOR_KEY)
     active_editor_key = st.session_state.get("_active_editor_key")
     editor_state = st.session_state.get(active_editor_key, {})
     edited_rows = editor_state.get("edited_rows", {})
@@ -1228,4 +1013,3 @@ st.selectbox(
     key="status_filter",
     on_change=on_status_filter_change,
 )
-

@@ -48,7 +48,7 @@ SPONSOR_NAME_UPPER = "LOREAL"
 SPONSOR_NAME_LOWER = SPONSOR_NAME_UPPER.lower()
 SPONSOR_NAME = "L'Oréal"
 STATE_DBX_PATH = st.secrets.get(f"STATE_DBX_PATH_{SPONSOR_NAME_UPPER}")
-DOODLE_URL = st.secrets[f"DOODLE_URL_{SPONSOR_NAME_UPPER}"] if f"DOODLE_URL_{SPONSOR_NAME_UPPER}" in st.secrets else None
+DOODLE_URL = st.secrets[f"DOODLE_URL_EDITOR_{SPONSOR_NAME_UPPER}"] if f"DOODLE_URL_EDITOR_{SPONSOR_NAME_UPPER}" in st.secrets else None
 CV_ROOT = "/CVs_2025"
 LOGO_PATH = "images/logo-partenaires-loreal-300x135.png" #"images/loreal.png"
 

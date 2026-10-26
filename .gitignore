@@ -44,3 +44,6 @@ get_reference_data.ipynb
 
 # test
 tests/
+
+# qr codes
+qr_codes*/

@@ -13,32 +13,109 @@ from audit_logger import log_auth_event
 # =====================================
 PASSWORD_HASHER = PasswordHasher()
 
-def authenticate(username: str, password: str, allowed_username: str, auth_log_path: str) -> str | None:
-    """Authenticate the recruiter assigned to this app and return recruiter_id."""
+# def authenticate(username: str, password: str, allowed_username: str, auth_log_path: str) -> str | None:
+#     """Authenticate the recruiter assigned to this app and return recruiter_id.
+    
+#     Returns:
+#         The recruiter's ID on success, or None on failure.
+#     """    
 
-    username = username.strip().lower()
+#     # Reject missing or malformed credentials safely.
+#     username = username if isinstance(username, str) else ""
+#     password = password if isinstance(password, str) else ""
 
+#     allowed_username = (
+#             allowed_username
+#             if isinstance(allowed_username, str)
+#             else ""
+#         )
+    
+#     # Keep the submitted username unchanged for exact comparison and logging.
+#     log_username = username if username.strip() else "unknown"
+
+#     try:
+#         # Reject missing or whitespace-only usernames and empty passwords.
+#         # Do not strip the password: whitespace may be intentional.
+#         if not username.strip() or not password:
+#             raise ValueError("Missing credentials")
+
+#         # Username matching is deliberately case-sensitive.
+#         if username != allowed_username:
+#             raise ValueError("Unauthorized recruiter")
+
+#         # Retrieve the configured recruiter's credentials.
+#         recruiter = st.secrets["recruiters"][username]
+#         password_hash = recruiter["password_hash"]
+#         recruiter_id = recruiter["recruiter_id"]
+
+#         # Fail closed if the configuration is incomplete or malformed.
+#         if not isinstance(password_hash, str) or not password_hash:
+#             raise ValueError("Invalid password configuration")
+
+#         if not isinstance(recruiter_id, str) or not recruiter_id:
+#             raise ValueError("Invalid recruiter configuration")
+
+#         # Verify the submitted password against its Argon2 hash.
+#         PASSWORD_HASHER.verify(password_hash, password)
+
+#         log_auth_event(
+#             auth_log_path,
+#             username=log_username,
+#             event="login_success",
+#             success=True,
+#         )
+#         return recruiter_id
+
+#     except (
+#         KeyError,
+#         TypeError,
+#         ValueError,
+#         VerifyMismatchError,
+#         VerificationError,
+#         InvalidHashError,
+#     ):
+#         log_auth_event(
+#             auth_log_path,
+#             username=log_username,
+#             event="login_failure",
+#             success=False,
+#         )
+#         return None
+
+def authenticate(
+    username: str,
+    password: str,
+    allowed_username: str,
+    auth_log_path: str,
+) -> str | None:
+    """Return the recruiter ID only if authentication and audit logging succeed."""
+
+    username = username if isinstance(username, str) else ""
+    password = password if isinstance(password, str) else ""
+    allowed_username = (
+        allowed_username if isinstance(allowed_username, str) else ""
+    )
+    log_username = username if username.strip() else "unknown"
+
+    # Validate input and authenticate.
     try:
-        # 1. Restrict access to the recruiter assigned to this app
-        if username != allowed_username:
-            raise ValueError("Unauthorized recruiter for this app")
+        if not username.strip() or not password:
+            raise ValueError("Missing credentials")
 
-        # 2. Retrieve the recruiter's credentials
+        if username != allowed_username:
+            raise ValueError("Unauthorized username")
+
         recruiter = st.secrets["recruiters"][username]
         password_hash = recruiter["password_hash"]
+        recruiter_id = recruiter["recruiter_id"]
 
-        # 3. Verify the password
+        if not isinstance(password_hash, str) or not password_hash:
+            raise ValueError("Invalid password configuration")
+
+        if not isinstance(recruiter_id, str) or not recruiter_id:
+            raise ValueError("Invalid recruiter configuration")
+
         PASSWORD_HASHER.verify(password_hash, password)
-
-        # 4. Log successful authentication
-        log_auth_event(
-            auth_log_path,
-            username=username,
-            event="login_success",
-            success=True,
-        )
-
-        return recruiter["recruiter_id"]
 
     except (
         KeyError,
@@ -48,14 +125,32 @@ def authenticate(username: str, password: str, allowed_username: str, auth_log_p
         VerificationError,
         InvalidHashError,
     ):
-        log_auth_event(
-            auth_log_path,
-            username=username,
-            event="login_failure",
-            success=False,
-        )
+        # Best effort: record the failure, but never authenticate on this path.
+        try:
+            log_auth_event(
+                auth_log_path,
+                username=log_username,
+                event="login_failure",
+                success=False,
+            )
+        except OSError:
+            # Logging is unavailable; authentication still fails.
+            pass
 
         return None
+
+    # Credentials are valid. Access is granted only if success is audited.
+    try:
+        log_auth_event(
+            auth_log_path,
+            username=log_username,
+            event="login_success",
+            success=True,
+        )
+    except OSError as exc:
+        raise AuditLogUnavailableError from exc
+
+    return recruiter_id
 
 def render_login(sponsor_name: str, allowed_username: str, auth_log_path: str) -> bool:
     """
@@ -85,14 +180,13 @@ def render_login(sponsor_name: str, allowed_username: str, auth_log_path: str) -
         )
 
     if submitted:
-        normalized_username = username.strip().lower()
-        recruiter_id = authenticate(normalized_username, password, allowed_username, auth_log_path)
+        recruiter_id = authenticate(username, password, allowed_username, auth_log_path)
 
         if recruiter_id is None:
             st.error("Invalid username or password.")
         else:
             st.session_state.authenticated = True
-            st.session_state.username = normalized_username
+            st.session_state.username = username
             st.session_state.recruiter_id = recruiter_id
             st.rerun()
 
@@ -101,3 +195,7 @@ def render_login(sponsor_name: str, allowed_username: str, auth_log_path: str) -
     st.stop()
 
     return False  # Unreachable; st.stop() halts execution.
+
+
+class AuditLogUnavailableError(Exception):
+    """Raised when a successful authentication cannot be audited."""

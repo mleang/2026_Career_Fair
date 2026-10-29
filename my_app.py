@@ -8,7 +8,7 @@ import html
 
 # from streamlit_autorefresh import st_autorefresh
 from ui_render import configure_page, render_header
-from authentication_handler_new import authenticate, render_login
+from authentication_handler import authenticate, render_login
 from audit_logger import log_activity
 from dropbox_storage import _build_dbx_client, _get_remote_hash, get_cv_pdf_base64, _download_current_df_from_dbx
 from merge_handler import _ensure_schema, _norm, _key, _build_delta_from_editor
@@ -71,7 +71,7 @@ if not logger.hasHandlers():
 # ------------ DATA SCHEMA ------------
 # =====================================
 # ---------------- Columns ----------------
-FIRST, LAST, FILE = "first_name", "last_name", "file_name"   # FILE is a full URL
+FIRST, LAST, FILE = "first_name", "last_name", "file_path"   # Related file path
 SEEN, INT, SAVE, CONT = "seen", "intend_view", "cv_saved", "contacted"
 
 BOOL_COLS = [

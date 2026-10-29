@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 import logging
 import requests
-
+import json
 
 from audit_logger import log_activity
 
@@ -25,7 +25,7 @@ logger = setup_logging("merge_handler")
 # ---------------- Helpers ----------------
 def _norm(value: str) -> str:
     """Normalize text for search/comparison."""
-    if value is None:
+    if value is None or pd.isna(value):
         return ""
     value = str(value).strip()
     value = unicodedata.normalize("NFKD", value)
@@ -57,19 +57,52 @@ def _ensure_schema(df: pd.DataFrame, text_cols: list, bool_cols: list, first: st
         | df[file].fillna("").astype(str).str.strip().ne("")
     )
 
-    # df = df.loc[valid].copy()
-    #return df[[*TEXT_COLS, *BOOL_COLS]] 
     return df.loc[valid, [*text_cols, *bool_cols]].copy()
 
 
 # ---------------- Keys & snapshots ----------------
 
 def _key(df_like: pd.DataFrame, first: str, last: str, file: str) -> pd.Series:
-    return (
-        df_like[first].fillna("").astype(str).str.strip().str.lower() + "||" +
-        df_like[last].fillna("").astype(str).str.strip().str.lower() + "||" +
-        df_like[file].fillna("").astype(str).str.strip()
-    )
+    """Generate collision-resistant candidate keys.
+
+    Names:
+        - case-insensitive
+        - accent-insensitive
+        - whitespace-normalized
+
+    File paths:
+        - leading/trailing whitespace stripped
+        - case-sensitive
+
+    JSON serialization prevents collisions between fields containing
+    the separator used by the previous implementation.
+    """
+    # Previous implementation used a simple string concatenation with "||" as a separator.
+    # return (
+    #     df_like[first].fillna("").astype(str).str.strip().str.lower() + "||" +
+    #     df_like[last].fillna("").astype(str).str.strip().str.lower() + "||" +
+    #     df_like[file].fillna("").astype(str).str.strip()
+    # )
+
+    first_names = df_like[first].map(_norm)
+    last_names = df_like[last].map(_norm)
+    file_paths = df_like[file].fillna("").astype(str).str.strip()
+
+    keys = [
+        json.dumps(
+            [first_name, last_name, file_path],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        for first_name, last_name, file_path in zip(
+            first_names,
+            last_names,
+            file_paths,
+        )
+    ]
+
+    return pd.Series(keys, index=df_like.index)
+
 
 # Keep an immutable snapshot to compute deltas (base)
 def _snapshot_base(text_cols: list, bool_cols: list, first: str, last: str, file: str) -> None:
@@ -686,3 +719,78 @@ def _upload_if_revision_matches(csv_bytes: bytes, expected_rev: str, dbx: dropbo
         raise RuntimeError(
             f"Unexpected error uploading to Dropbox: {exc}"
         ) from exc
+    
+
+
+def _refresh_from_remote(
+    remote_df: pd.DataFrame,
+    text_cols: list,
+    bool_cols: list,
+    first: str,
+    last: str,
+    file: str,
+) -> tuple[pd.DataFrame, list]:
+    """Reconcile a downloaded remote snapshot with the current session.
+
+    If the session has no baseline, initialize from the remote snapshot.
+
+    If there are no unsaved local changes, adopt the remote snapshot as
+    both the working DataFrame and the merge baseline.
+
+    If local changes are pending, merge them with the remote snapshot
+    against the existing baseline. Preserve that original baseline and
+    keep the dirty flag set so a later save can perform its own fresh
+    download-and-merge cycle.
+
+    This function does not download from Dropbox, update remote hashes,
+    save the CSV, or trigger a Streamlit rerun. Those side effects are
+    deliberately kept in the caller.
+
+    Returns:
+        (working_dataframe, conflicts)
+    """
+    remote = _ensure_schema(
+        remote_df.copy(deep=True),
+        text_cols, bool_cols, first, last, file,
+    )
+
+    base = st.session_state.get("base_df")
+    ours = st.session_state.get("df")
+    dirty = st.session_state.get("buffer_dirty", False)
+
+    if base is None or ours is None:
+        working = remote.copy(deep=True)
+        st.session_state.df = working.copy(deep=True)
+        st.session_state.base_df = remote.copy(deep=True)
+        st.session_state.buffer_dirty = False
+        return working, []
+
+    base = _ensure_schema(
+        base.copy(deep=True),
+        text_cols, bool_cols, first, last, file,
+    )
+    ours = _ensure_schema(
+        ours.copy(deep=True),
+        text_cols, bool_cols, first, last, file,
+    )
+
+    merged, conflicts = _three_way_merge(
+        base, ours, remote,
+        text_cols, bool_cols, first, last, file,
+    )
+    merged = _ensure_schema(
+        merged, text_cols, bool_cols, first, last, file,
+    )
+
+    st.session_state.df = merged.copy(deep=True)
+
+    if dirty:
+        # Keep the original baseline: the local edits are not yet saved.
+        st.session_state.base_df = base.copy(deep=True)
+        st.session_state.buffer_dirty = True
+    else:
+        # No local edits: the downloaded snapshot is now the baseline.
+        st.session_state.base_df = remote.copy(deep=True)
+        st.session_state.buffer_dirty = False
+
+    return merged, conflicts

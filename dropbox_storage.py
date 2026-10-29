@@ -262,13 +262,29 @@ def _validate_cv_path(path: str, cv_root: str) -> str:
 #     return base64.b64encode(pdf_bytes).decode("ascii")
 
 def get_cv_pdf_base64(dbx: dropbox.Dropbox, cv_path: str) -> str:
-    """Download a CV from Dropbox and return as base64-encoded string."""
+    """Download a CV from Dropbox and return as base64-encoded string.
+
+    Args:
+        dbx: Initialized Dropbox client.
+        cv_path: Dropbox path of the selected candidate's PDF.
+
+    Returns:
+        Base64-encoded PDF content as a UTF-8 string.
+
+    Raises:
+        ValueError: If the Dropbox client or CV path is invalid.
+        RuntimeError: If Dropbox download or base64 encoding fails.
+    """
     
     if not dbx:
         raise ValueError("Dropbox client not initialized")
     
-    if not cv_path or not isinstance(cv_path, str):
+    # Validate type before calling string methods
+    if not isinstance(cv_path, str) or not cv_path.strip():
         raise ValueError(f"Invalid CV path: {cv_path}")
+    
+    # Remove accidental leading/trailing whitespace before passing the path to Dropbox.
+    cv_path = cv_path.strip()
     
     try:
         print(f"DEBUG: Downloading CV from: {cv_path}")

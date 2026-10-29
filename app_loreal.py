@@ -48,7 +48,7 @@ LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 AUTH_LOG = LOG_DIR / f"auth_log_{SPONSOR_NAME_LOWER}.csv"
 ACTIVITY_LOG = LOG_DIR / f"activity_log_{SPONSOR_NAME_LOWER}.csv"
-DEBUG = True
+DEBUG = False
 
 # Authentication
 ALLOWED_USERNAME = SPONSOR_NAME_LOWER

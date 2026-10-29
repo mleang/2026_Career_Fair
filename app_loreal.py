@@ -48,7 +48,7 @@ LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 AUTH_LOG = LOG_DIR / f"auth_log_{SPONSOR_NAME_LOWER}.csv"
 ACTIVITY_LOG = LOG_DIR / f"activity_log_{SPONSOR_NAME_LOWER}.csv"
-DEBUG = False
+DEBUG = True
 
 # Authentication
 ALLOWED_USERNAME = SPONSOR_NAME_LOWER
@@ -71,7 +71,7 @@ if not logger.hasHandlers():
 # ------------ DATA SCHEMA ------------
 # =====================================
 # ---------------- Columns ----------------
-FIRST, LAST, FILE = "first_name", "last_name", "file_name"   # FILE is a full URL
+FIRST, LAST, FILE = "first_name", "last_name", "file_path" # FILE is a related path
 SEEN, INT, SAVE, CONT = "seen", "intend_view", "cv_saved", "contacted"
 
 BOOL_COLS = [

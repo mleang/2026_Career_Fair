@@ -76,7 +76,7 @@ def configure_page(app_title: str, page_icon: str) -> None:
 # ======================================
 def render_header(logo_path: str, sponsor_name: str, username: str, recruiter_id: str, auth_log_path: str) -> None:
     logo_col, title_col, account_col = st.columns(
-        [1.1, 5.2, 1.7],
+        [1.3, 5.2, 1.7],
         vertical_alignment="center",
     )
 

@@ -71,7 +71,7 @@ if not logger.hasHandlers():
 # ------------ DATA SCHEMA ------------
 # =====================================
 # ---------------- Columns ----------------
-FIRST, LAST, FILE = "first_name", "last_name", "file_name"   # FILE is a full URL
+FIRST, LAST, FILE = "first_name", "last_name", "file_path" # FILE is a related path
 SEEN, INT, SAVE, CONT = "seen", "intend_view", "cv_saved", "contacted"
 
 BOOL_COLS = [

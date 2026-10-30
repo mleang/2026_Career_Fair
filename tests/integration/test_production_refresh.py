@@ -22,7 +22,7 @@ separately.
 import pandas as pd
 import pytest
 
-import merge_handler as mh
+import career_fair.storage.merge_handler as mh
 
 
 # Candidate identity and status columns expected by the merge handler.

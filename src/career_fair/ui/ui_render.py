@@ -5,7 +5,7 @@ import streamlit as st
 import pathlib
 from pathlib import Path
 
-from audit_logger import log_auth_event
+from src.career_fair.utils.audit_logger import log_auth_event
 
 
 def load_css(path: str = "assets/styles.css"):

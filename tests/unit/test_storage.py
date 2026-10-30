@@ -2,8 +2,8 @@
 import pandas as pd
 import pytest
 
-from dropbox_storage import _download_current_df_from_dbx
-from dropbox_storage import (
+from career_fair.storage.dropbox_storage import _download_current_df_from_dbx
+from career_fair.storage.dropbox_storage import (
     _build_dbx_client,
     _get_remote_hash,
     get_cv_pdf_base64,

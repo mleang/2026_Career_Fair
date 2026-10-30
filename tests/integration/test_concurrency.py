@@ -16,7 +16,7 @@ import threading
 
 import pytest
 
-from merge_handler import _three_way_merge
+from career_fair.storage.merge_handler import _three_way_merge
 from conftest import (
     FakeDropbox, make_df, FIRST, LAST, FILE, SEEN, INT, SAVE, CONT,
     TEXT_COLS, BOOL_COLS,

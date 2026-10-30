@@ -19,8 +19,8 @@ import pytest
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError
 
-import authentication_handler
-from authentication_handler import (
+import career_fair.auth.authentication_handler as authentication_handler
+from career_fair.auth.authentication_handler import (
     AuditLogUnavailableError,
     authenticate,
 )

@@ -6,7 +6,7 @@ from argon2.exceptions import (
     InvalidHashError,
 )
 
-from audit_logger import log_auth_event
+from src.career_fair.utils.audit_logger import log_auth_event
 
 # =====================================
 # ------- AUTHENTICATION --------------
@@ -195,7 +195,6 @@ def render_login(sponsor_name: str, allowed_username: str, auth_log_path: str) -
     st.stop()
 
     return False  # Unreachable; st.stop() halts execution.
-
 
 class AuditLogUnavailableError(Exception):
     """Raised when a successful authentication cannot be audited."""

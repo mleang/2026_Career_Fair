@@ -7,28 +7,28 @@ import streamlit as st
 import html
 
 # from streamlit_autorefresh import st_autorefresh
-from ui_render import configure_page, render_header
-from authentication_handler import authenticate, render_login
-from audit_logger import log_activity
-from dropbox_storage import _build_dbx_client, _get_remote_hash, get_cv_pdf_base64, _download_current_df_from_dbx
-from merge_handler import _ensure_schema, _norm, _key, _build_delta_from_editor
-from merge_handler import _apply_optimistic, _compute_view_and_key, _flush_to_disk
-from merge_handler import _reset_grid, _handle_editor_change, _active_editor_key, _mark_dirty
-from merge_handler import _three_way_merge, _snapshot_base
+from src.career_fair.ui.ui_render import configure_page, render_header
+from src.career_fair.auth.authentication_handler import authenticate, render_login
+from src.career_fair.utils.audit_logger import log_activity
+from src.career_fair.storage.dropbox_storage import _build_dbx_client, _get_remote_hash, get_cv_pdf_base64, _download_current_df_from_dbx
+from src.career_fair.storage.merge_handler import _ensure_schema, _norm, _key, _build_delta_from_editor
+from src.career_fair.storage.merge_handler import _apply_optimistic, _compute_view_and_key, _flush_to_disk
+from src.career_fair.storage.merge_handler import _reset_grid, _handle_editor_change, _active_editor_key, _mark_dirty
+from src.career_fair.storage.merge_handler import _three_way_merge, _snapshot_base
 import logging
-from dropbox_storage import DROPBOX_TIMEOUT_SEC
+from src.career_fair.storage.dropbox_storage import DROPBOX_TIMEOUT_SEC
 
 # ==============================================
 # --------- CONFIGURATION SETTINGS  ------------
 # ==============================================
-SPONSOR_NAME_UPPER = "LOREAL"
+SPONSOR_NAME_UPPER = "TOTAL"
 SPONSOR_NAME_LOWER = SPONSOR_NAME_UPPER.lower()
-SPONSOR_NAME = "L'Oréal"
+SPONSOR_NAME = "TotalEnergies"
 APP_TITLE  = f"{SPONSOR_NAME} Career Fair"
 PAGE_ICON  = "🎓"
 STATE_DBX_PATH = st.secrets.get(f"STATE_DBX_PATH_{SPONSOR_NAME_UPPER}")
 DOODLE_URL = st.secrets[f"DOODLE_URL_EDITOR_{SPONSOR_NAME_UPPER}"] if f"DOODLE_URL_EDITOR_{SPONSOR_NAME_UPPER}" in st.secrets else None
-LOGO_PATH = "images/logo_loreal.jpg"
+LOGO_PATH = "images/logo_total.svg"
 
 # Auto-refresh (poll)
 UTC = timezone.utc

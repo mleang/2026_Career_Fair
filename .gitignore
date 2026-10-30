@@ -44,9 +44,19 @@ get_reference_data.ipynb
 
 # test
 tests/__pycache__
+test_CVs/
 
 # qr codes
 qr_codes*/
 
 # fonts
 fonts/
+
+# OS / IDE
+.DS_Store
+images/.DS_Store
+.idea/
+.vscode/
+#Temporary files
+*.tmp
+*.bak

@@ -202,7 +202,7 @@ from unittest.mock import Mock
 import dropbox
 import pytest
 
-from dropbox_storage import get_cv_pdf_base64
+from career_fair.storage.dropbox_storage import get_cv_pdf_base64
 
 
 @pytest.fixture

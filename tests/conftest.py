@@ -16,15 +16,17 @@ import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+
+APP_PATH = os.environ.get(
+    "APP_PATH",
+    str(ROOT / "apps" / "my_app.py"),
+)
 
 FIRST, LAST, FILE = "first_name", "last_name", "file_path"
 SEEN, INT, SAVE, CONT = "seen", "intend_view", "cv_saved", "contacted"
 TEXT_COLS = [FIRST, LAST, FILE]
 BOOL_COLS = [SEEN, INT, SAVE, CONT]
 ALL_COLS = [*TEXT_COLS, *BOOL_COLS]
-
-APP_PATH = os.environ.get("APP_PATH", str(ROOT / "my_app.py"))
 
 
 def make_df(rows):

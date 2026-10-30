@@ -8,7 +8,7 @@ import logging
 import requests
 import json
 
-from audit_logger import log_activity
+from src.career_fair.utils.audit_logger import log_activity
 
 # _ensure_schema()	Ensure required columns and data types are present.
 # _norm()	Normalize values before comparing them, such as handling missing values.
@@ -20,7 +20,7 @@ from audit_logger import log_activity
 # _build_delta_from_editor()	Extract changes made in the Streamlit editor relative to the baseline.
 # _flush_to_disk()	Coordinate saving: fetch latest data, merge edits, and persist the reconciled result.
 
-from logging_config import setup_logging
+from src.career_fair.utils.logging_config import setup_logging
 logger = setup_logging("merge_handler")
 # ---------------- Helpers ----------------
 def _norm(value: str) -> str:

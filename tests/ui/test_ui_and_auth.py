@@ -14,6 +14,7 @@ import pytest
 from unittest.mock import MagicMock
 from argon2 import PasswordHasher
 from streamlit.testing.v1 import AppTest
+from pathlib import Path
 
 from conftest import APP_PATH
 
@@ -34,50 +35,48 @@ TIMEOUT = 15
 # Fixtures
 # ---------------------------------------------------------------------
 
+
 @pytest.fixture
 def app(monkeypatch, candidates):
-    """Create a Streamlit AppTest instance with mocked Dropbox dependencies.
+    """Create an AppTest instance of the recruiter application.
 
-    The shared `candidates` fixture provides a deterministic candidate
-    DataFrame. Dropbox client creation, remote reads, hashing, CV downloads,
-    and disk writes are mocked to avoid external dependencies.
-
-    The application receives the same secrets structure as production,
-    including the recruiter password hash and recruiter ID.
+    Dropbox operations are mocked to keep tests deterministic and
+    independent of external services.
     """
     store = {"df": candidates.copy(deep=True)}
     fake_dbx = MagicMock()
 
-    # Mock Dropbox client initialization.
+    # Patch the modules actually imported by apps/my_app.py.
+    import career_fair.storage.dropbox_storage as dropbox_storage
+    import career_fair.storage.merge_handler as merge_handler
+
     monkeypatch.setattr(
-        "dropbox_storage._build_dbx_client",
+        dropbox_storage,
+        "_build_dbx_client",
         lambda *args, **kwargs: fake_dbx,
     )
-
-    # Mock remote state hash retrieval.
     monkeypatch.setattr(
-        "dropbox_storage._get_remote_hash",
+        dropbox_storage,
+        "_get_remote_hash",
         lambda *args, **kwargs: "hash-1",
     )
-
-    # Mock remote CSV download.
     monkeypatch.setattr(
-        "dropbox_storage._download_current_df_from_dbx",
+        dropbox_storage,
+        "_download_current_df_from_dbx",
         lambda *args, **kwargs: store["df"].copy(deep=True),
     )
-
-    # Mock CV download.
     monkeypatch.setattr(
-        "dropbox_storage.get_cv_pdf_base64",
+        dropbox_storage,
+        "get_cv_pdf_base64",
         lambda *args, **kwargs: "JVBERi0=",
     )
-
-    # Mock persistence to disk.
     monkeypatch.setattr(
-        "merge_handler._flush_to_disk",
+        merge_handler,
+        "_flush_to_disk",
         lambda *args, **kwargs: True,
     )
 
+    # Execute the actual application, not the diagnostic form script.
     at = AppTest.from_file(APP_PATH, default_timeout=TIMEOUT)
 
     at.secrets["STATE_DBX_PATH_LOREAL"] = "/state_loreal.csv"
@@ -87,6 +86,8 @@ def app(monkeypatch, candidates):
             "recruiter_id": RECRUITER_ID,
         }
     }
+
+    at.run()
 
     return at
 

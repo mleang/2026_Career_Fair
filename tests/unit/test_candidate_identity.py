@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from merge_handler import _key, _norm, _ensure_schema
+from career_fair.storage.merge_handler import _key, _norm, _ensure_schema
 
 
 FIRST = "first_name"

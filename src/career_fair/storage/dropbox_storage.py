@@ -8,8 +8,8 @@ from pathlib import Path, PurePosixPath
 import base64
 import logging
 
-from merge_handler import _ensure_schema
-from logging_config import setup_logging
+from src.career_fair.storage.merge_handler import _ensure_schema
+from src.career_fair.utils.logging_config import setup_logging
 
 logger = setup_logging("dropbox_storage")
 

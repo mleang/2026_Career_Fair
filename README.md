@@ -1,179 +1,279 @@
-# HI! PARIS Career Fair — App
+# 🎓 Hi! PARIS Career Fair — Recruiter App
 
-An app to browse candidates, open CVs, and mark follow‑up flags. Designed to duplicate per sponsor (“mécène”) with minimal changes.
+### Find the right candidates. Keep every follow-up moving. ⚡
 
----
+A lightweight **Streamlit** workspace for the Hi! PARIS Career Fair. Recruiters search candidates, open CVs, track follow-ups and check Doodle bookings, while **several colleagues edit the same candidate list at the same time** through Dropbox.
 
-## What it does
+> **5 sponsors · 5 applications · 1 smoother career-fair workflow.**
 
-- Search candidates by first/last name.
-- Open CVs directly from the table (each row has a link).
-- Tick flags (Profile viewed / Interested / CV saved / Candidate contacted).
-- Saves changes automatically to a CSV in your Dropbox **App Folder**.
-
-It’s optimized for speed: the app **reads** a compact CSV via a **shared link** and **writes** updates via the Dropbox API. The app does not download PDFs—links open in the browser.
+📘 **Recruiters:** jump straight to the [User Guide](USER_GUIDE.md).
+🛠️ **Organisers / developers:** you are in the right place.
 
 ---
 
-## Data format (CSV)
+## ✨ What it does
 
-One row per candidate:
-
-| Column        | Type   | Notes                                                             |
-|--------------|--------|-------------------------------------------------------------------|
-| `first_name` | string | Required                                                          |
-| `last_name`  | string | Required                                                          |
-| `file_name`  | string | **Full URL** to the CV (Dropbox shared link, or any reachable URL) |
-| `seen`       | bool   | `0/1`, `true/false`, `yes/no` (missing is treated as `false`)     |
-| `intend_view`| bool   | same as above                                                     |
-| `cv_saved`   | bool   | same as above                                                     |
-| `contacted`  | bool   | same as above                                                     |
-
-> Keep the CSV lean (only these columns) for the best performance.
+| | Feature |
+|---|---|
+| 🔐 | Sponsor-specific recruiter login (`Argon2`-hashed passwords) |
+| 🔎 | Accent- and case-insensitive candidate search |
+| 📄 | One-click CV retrieval from Dropbox |
+| 👁️ ⭐ 💾 ✉️ | Four shared status flags: **Viewed**, **Interested**, **CV saved**, **Contacted** |
+| 🔄 | Safe multi-recruiter editing with three-way merge and manual **Refresh** |
+| 💿 | Debounced autosave plus a **Save now** button |
+| 📊 | Live statistics and status filters |
+| 📅 | One-click access to the sponsor's Doodle editor board |
 
 ---
 
-## Quick start (local)
+## 🧠 How it works (the 60-second version)
 
-1. **Clone** the repo and `cd` into it.
-2. Create `.streamlit/secrets.toml` (see **Secrets** below).
-3. (Optional) Put a logo at `images/hi-paris.png` (or per sponsor, e.g. `images/loreal.png`).
-4. Install deps and run:
-   ```bash
-   pip install -r requirements.txt
-   streamlit run my_app.py
-   ```
+```mermaid
+flowchart LR
+    R1[👩‍💼 Recruiter A] -->|edits| S1[Session state A]
+    R2[👨‍💼 Recruiter B] -->|edits| S2[Session state B]
+    S1 -->|autosave / Save now| M{{🔀 3-way merge}}
+    S2 -->|autosave / Save now| M
+    M -->|revision-aware write| D[(☁️ Dropbox CSV)]
+    D -->|Refresh| S1
+    D -->|Refresh| S2
+    D -.->|on demand| CV[📄 CV PDFs]
+```
 
-> You can test read-only with just the **shared CSV URL**. Writing needs Dropbox secrets.
+1. 📥 The app loads the sponsor's candidate-state CSV from Dropbox.
+2. ✍️ Each browser session keeps its **own working copy**.
+3. 💾 Saves go through a merge step so one recruiter does not overwrite another.
+4. 🔄 Remote changes become visible on **Refresh**. Never assume sync is instantaneous.
+5. 📄 CV PDFs are fetched from Dropbox only when requested.
+
+### 🔀 Concurrency model
+
+Each session remembers a **base** snapshot (what it last synced), its **local** edits, and the **remote** file. On save or refresh the app performs a **three-way merge** per candidate and per column:
+
+| Situation | Result |
+|---|---|
+| Different candidates edited | ✅ both kept |
+| Same candidate, different flags | ✅ both kept |
+| Same flag, same new value | ✅ no conflict |
+| Same flag, different values | ⚠️ conflict reported, **local value wins** |
+
+Candidates are identified by a stable key built from **first name + last name + CV path**, so two people named *Jean Martin* with different CVs stay separate.
 
 ---
 
-## Streamlit **secrets** (the essentials)
+## 🚀 Quick start
 
-You’ll configure **one pair per sponsor** for the **read URL** (public shared link) and the **write path** (Dropbox App Folder).  
-You also provide **Dropbox credentials** so the app can write.
+```bash
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+streamlit run my_app.py            # or app_<sponsor>.py
+```
 
-### A) Per-sponsor entries
+Each sponsor needs its **own** recruiter credentials, CSV and Doodle links.
 
-Example for two sponsors:
+---
+
+## 🔐 Secrets and Git hygiene
+
+> ⚠️ **NEVER commit secrets or real candidate data.** Deleting a secret in a later commit does **not** remove it from Git history.
+
+Keep out of Git: Dropbox tokens, app secrets, passwords and password hashes, real CVs, candidate CSVs. Add `.streamlit/secrets.toml` to `.gitignore` **before** creating it.
+
+### Recruiter accounts
+
+Generate hashes with `generate_recruiter_password_hashes.py`, then store them as `authentication_handler.py` expects (looked up by lower-cased username):
 
 ```toml
-# L'Oréal app
-STATE_SHARED_CSV_URL_LOREAL = "https://www.dropbox.com/scl/fi/.../cv_state_full_url_loreal.csv?dl=0"
-STATE_DBX_PATH_LOREAL       = "/CV-CarrerFair/loreal/cv_state_full_url.csv"
-
-# Capgemini app
-STATE_SHARED_CSV_URL_CAPGEMINI = "https://www.dropbox.com/scl/fi/.../cv_state_full_url_capgemini.csv?dl=0"
-STATE_DBX_PATH_CAPGEMINI       = "/CV-CarrerFair/capgemini/cv_state_full_url.csv"
+# .streamlit/secrets.toml
+[recruiters.loreal]
+password_hash = "$argon2id$v=19$..."
+recruiter_id  = "rec-loreal-1"
 ```
 
-In each sponsor app file (e.g. `my_app_loreal.py`), reference the matching keys:
+The username must equal the sponsor's `ALLOWED_USERNAME` in the entry point.
 
-```python
-STATE_SHARED_CSV_URL = st.secrets.get("STATE_SHARED_CSV_URL_LOREAL")
-STATE_DBX_PATH       = st.secrets.get("STATE_DBX_PATH_LOREAL")
+### Two Doodle links, two audiences
+
+| Link | Used by | Purpose |
+|---|---|---|
+| **Participant link** | Students | Scan the QR code and book a 5-minute slot |
+| **Editor / organiser link** | Recruiters | See who booked (the 📅 Doodle button) |
+
+QR codes point to the **participant** link. The app button points to the **editor** link.
+
+---
+
+## ☁️ Dropbox setup
+
+### Candidate CSV (one per sponsor)
+
+| Column | Meaning |
+|---|---|
+| `first_name`, `last_name` | Candidate identity |
+| `file_path` | Dropbox path of the CV (must exist) |
+| `seen` | Profile viewed |
+| `intend_view` | Marked interesting |
+| `cv_saved` | CV saved |
+| `contacted` | Candidate contacted |
+
+```csv
+first_name,last_name,file_path,seen,intend_view,cv_saved,contacted
+Alice,Photon,/CVs_2026/Photon_Alice.pdf,0,0,0,0
+Bob,Neutron,/CVs_2026/Neutron_Bob.pdf,1,1,0,0
 ```
 
-- **Read URL** is public and used **only for reading** (fast).
-- **Write path** is inside your **Dropbox App Folder** and used for saving.
+Fake CVs for testing live in `test_CVs/fake_CVs`.
 
-### B) Dropbox credentials (for writing)
+### Access credentials
 
-Choose **one** of the two options:
+Create an app in the [Dropbox App Console](https://www.dropbox.com/developers/apps). A **refresh token** is preferred for long-running deployments:
 
-**Option 1 — Access token (simple)**
 ```toml
-DROPBOX_ACCESS_TOKEN = "sl.BC...."  # App must have files.content.write scope
+DROPBOX_APP_KEY       = "YOUR_APP_KEY"
+DROPBOX_APP_SECRET    = "YOUR_APP_SECRET"
+DROPBOX_REFRESH_TOKEN = "YOUR_REFRESH_TOKEN"
+# alternative: DROPBOX_ACCESS_TOKEN = "..."
 ```
 
-**Option 2 — Refresh token (recommended)**
+Get the refresh token by opening this URL with your app key, clicking **Allow**, then exchanging the code:
+
+```
+https://www.dropbox.com/oauth2/authorize?client_id=XXX&response_type=code&token_access_type=offline
+```
+
+`token_access_type=offline` is what makes Dropbox issue a long-lived refresh token. The account must be able to **read** the CSV and CVs and **write** the CSV. A wrong path gives a `not_found` error.
+
+---
+
+## 🌐 Deploy on Streamlit Community Cloud
+
+One deployment per sponsor, each with its own URL and its own secrets.
+
+1. Push the code to GitHub (entry points, modules, `requirements.txt`, `assets/`, `images/`).
+2. On [share.streamlit.io](https://share.streamlit.io/) choose **Create app**, pick repo, branch and the sponsor entry point.
+3. In **Advanced settings → Secrets**, paste that sponsor's TOML.
+4. Deploy, then test login and the Dropbox connection.
+
+Sponsor-specific keys follow a suffix pattern:
+
 ```toml
-DROPBOX_APP_KEY = "your_app_key"
-DROPBOX_APP_SECRET = "your_app_secret"
-DROPBOX_REFRESH_TOKEN = "your_refresh_token"
+STATE_DBX_PATH_LOREAL    = "/CV-CareerFair/loreal/career_fair_all_candidates_loreal.csv"
+DOODLE_URL_EDITOR_LOREAL = "https://YOUR_LOREAL_DOODLE_EDITOR_LINK"
+# repeat with _CAPGEMINI, _SCHNEIDER, _TOTAL, _VINCI
 ```
 
-- With the refresh-token setup, the app automatically exchanges it for a short-lived access token when needed (no manual rotation).
-- In your Dropbox App Console, enable the **`files.content.write`** (and read) scopes.
+### Project layout
+
+```text
+project/
+├── my_app.py / app_<sponsor>.py   # entry points
+├── authentication_handler.py
+├── audit_logger.py
+├── dropbox_storage.py
+├── merge_handler.py
+├── ui_render.py
+├── create_qr_codes.py
+├── requirements.txt
+├── assets/styles.css
+├── images/
+├── tests/
+└── README.md
+```
+
+### ✅ Isolation check, per sponsor
+
+Correct logo · correct CSV · correct CV folder · Doodle button opens the **editor** board · only the intended credentials work · the app cannot write to another sponsor's CSV.
+
+> A public Streamlit URL is **not** public access to candidate data. Protect both the app (login) and the storage (Dropbox permissions).
 
 ---
 
-## Duplicating per sponsor (“mécène”)
+## 📱 Student QR codes
 
-1. Copy `my_app.py` → `my_app_<sponsor>.py`.
-2. Update:
-   - `APP_TITLE`, `LOGO_PATH`
-   - `STATE_SHARED_CSV_URL = st.secrets.get("STATE_SHARED_CSV_URL_<SPONSOR>")`
-   - `STATE_DBX_PATH       = st.secrets.get("STATE_DBX_PATH_<SPONSOR>")`
-3. Deploy that file as a separate Streamlit app.
+`create_qr_codes.py` reads the five participant URLs from secrets and builds QR codes carrying the Hi! PARIS and sponsor logos.
 
-Each sponsor gets its own CSV & write location.
+```toml
+DOODLE_URL_TO_SHARE_LOREAL = "https://YOUR_LOREAL_PARTICIPANT_LINK"
+# also _CAPGEMINI, _SCHNEIDER, _TOTAL, _VINCI
+```
 
----
+```bash
+pip install "qrcode[pil]" Pillow streamlit
+python create_qr_codes.py                    # square modules (default)
+python create_qr_codes.py --drawer rounded   # or circle
+python create_qr_codes.py --help             # logo sizes and paths
+```
 
-## Deployment notes
-
-- On Streamlit Cloud (or your infra), add all values in the **Secrets** panel (same as the example `.toml`).
-- If you see **“missing_scope: files.content.write”**, enable that scope in the Dropbox App Console → Permissions.
-- If reading fails, make sure the CSV shared link is public. The app forces `dl=1` to fetch the file bytes (not the HTML page).
-
----
-
-## Performance tips
-
-- One **CSV** for identity + flags is simplest and fastest.
-- Keep rows/columns minimal.
-- CVs are not fetched; links just open them—this keeps the UI snappy.
-- The app uses **optimistic UI**: your tick shows immediately while it writes in the background. On failure, it reverts and shows an error.
+Output goes to `qr_codes_simple_dual_centered_square/`, one PNG per sponsor. **Scan every code on a phone before printing**, check the booking flow end to end, and verify the printed size still scans.
 
 ---
 
-## Troubleshooting
+## 🧪 Tests
 
-- **“Dropbox token missing”**  
-  Add either `DROPBOX_ACCESS_TOKEN` **or** the refresh-token trio to secrets.
-- **“missing_scope: files.content.write”**  
-  Enable that scope in your Dropbox app, then redeploy.
-- **No links in the CV column**  
-  `file_name` must contain a **full URL** (e.g., a Dropbox shared link per PDF).
-- **Saves don’t persist**  
-  Check the sidebar status, confirm the write path is inside your Dropbox **App Folder**, and that your app has the correct scopes.
+```bash
+pip install -r tests/requirements-test.txt
+python -m pytest tests/ -q
+python -m pytest tests/ --cov=authentication_handler --cov=merge_handler --cov=dropbox_storage --cov-report=term-missing
+```
+
+| Area | What is checked |
+|---|---|
+| 🔀 Concurrency | Merge rules, no lost edits across many simultaneous recruiters |
+| 🧬 Candidate identity | Keys, missing values, same-name candidates |
+| 🔐 Authentication | Valid, invalid and malformed credentials |
+| 🖥️ UI | Login, log-out, search, toggles, filters, refresh (Streamlit `AppTest`, Dropbox mocked) |
+
+`AppTest.from_file()` resolves relative paths from the test file's folder, so tests use an absolute `APP_PATH` defined in `tests/conftest.py`.
 
 ---
 
-## Optional styling
+## 🛠️ Troubleshooting
 
-You can tweak the theme via `.streamlit/config.toml` and add CSS in `assets/styles.css`. The app will load them automatically.
+| Symptom | Check |
+|---|---|
+| `Failed to load CSV from Dropbox: not_found` | Exact `STATE_DBX_PATH_*`, leading `/`, capitalisation, token access |
+| 🔐 Login fails | Right sponsor app, `[recruiters.<user>]` secret, username equals `ALLOWED_USERNAME` |
+| 📄 CV does not open | `file_path` in the CSV, file exists, Dropbox read access, pop-ups allowed |
+| 💾 Save fails | Write permission, CSV path, error message; keep the tab open |
+| 🔄 Colleague's edits missing | Press **Refresh**, make sure your own save finished first |
+| 📅 Wrong Doodle page | `DOODLE_URL_EDITOR_<SPONSOR>` must be the editor link |
+| 📱 iPhone PDF problems | Use Chrome; Safari may not download PDFs |
 
 ---
 
-### Short checklist
+## 🔒 Security and data handling
 
-- [ ] Create sponsor CSV with required columns
-- [ ] Generate a **shared link** for the CSV (read)
-- [ ] Put write path inside **Dropbox App Folder**
-- [ ] Add Dropbox secrets (access or refresh token flow)
-- [ ] Set sponsor-specific secrets keys
-- [ ] Deploy `my_app_<sponsor>.py`
+Names and CVs are personal data. Keep secrets and data out of Git, restrict Dropbox access to the required folders, verify login on every deployment, hide debug panels and detailed exceptions from users, and review where authentication and activity logs are stored and for how long.
 
-That’s it — plug the right URLs/paths into secrets and go!
-=======
-# Career-Fair-App-V1
-HI! PARIS Career Fair — Streamlit Application
+---
 
-## last update
+## ✅ Launch checklist
 
-- 🧭 **Stable grid** (no flicker when editing)
-- 🔍 **Multi-token search**, accent-insensitive (`kadri farouk` or `farouk kadri`)
-- 💾 **Autosave policy**:
-  - Instant save (debounced) when filtering
-  - Buffered save every **30 s** when viewing full list (set to **180 s** in production)
-- 🧩 **Optimistic UI**: edits show instantly while saving in the background
-- 💡 **"Save now"** button under **Clear search**
-- 🧼 Code cleanup and helper functions for clarity and maintainability
+**Deployment**
+- [ ] Five sponsor apps deployed with correct branding, CSV paths and credentials
+- [ ] Dropbox access works for CSVs and CVs
+- [ ] Secrets live in Streamlit Cloud, not GitHub
 
-## performance tips
-- Autosave behavior can be tuned in `my_app.py`:
-  - `AUTOSAVE_DEBOUNCE_SEC` → delay between instant saves (default: 0.35 s)
-  - `BATCH_SAVE_INTERVAL_SEC` → buffered save interval (default: 30 s)
+**Students**
+- [ ] Participant Doodle links configured, QR codes generated, tested on Android and iPhone, printed and labelled
 
+**Recruiters**
+- [ ] Search, the four flags, Open CV, Save now, autosave work
+- [ ] **Refresh tested with two simultaneous sessions**
+- [ ] Conflicting edits tested and understood
+- [ ] No pending edits lost when changing filters or refreshing
+- [ ] Doodle button opens the editor board
+
+---
+
+## 🚀 Roadmap
+
+1. 🧩 **One configurable app for all sponsors.** A validated per-sponsor config (name, logo, CSV path, Doodle URL, allowed recruiter), selected by deployment secret rather than a URL parameter, with tests proving sponsors cannot be crossed.
+2. 🧪 **More tests.** CSV schema validation, Dropbox failure paths, sponsor isolation, unchecking after a concurrent update.
+3. 📈 **Locust load testing.** Streamlit sessions run over WebSockets, so plain HTTP load tests do not simulate a recruiter. Use a WebSocket-aware or browser-based client against staging with synthetic data, and measure latency (median, p95, p99), failed saves, Dropbox throttling and write contention.
+
+---
+
+<sub>Built for the Hi! PARIS Career Fair 🎓</sub>

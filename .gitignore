@@ -43,7 +43,10 @@ generate_password.py
 get_reference_data.ipynb
 
 # test
-# tests/
+tests/__pycache__
 
 # qr codes
 qr_codes*/
+
+# fonts
+fonts/

@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<style>
+@font-face{font-family:"Cera Pro";font-weight:300;src:local("Cera Pro Light"),local("CeraPro-Light"),url("fonts/CeraPro-Light.otf") format("opentype"),url("fonts/CeraPro-Light.woff2") format("woff2")}
+@font-face{font-family:"Cera Pro";font-weight:700;src:local("Cera Pro Bold"),local("CeraPro-Bold"),url("fonts/CeraPro-Bold.otf") format("opentype"),url("fonts/CeraPro-Bold.woff2") format("woff2")}
+@page { size: A4; margin: 0; }
+:root{--red:#FF034D;--navy:#004676;--ink:#262730;--mut:#6b7280;--bg:#f6f7fb;--blue:#004676;--pur:#7c3aed;}
+*{box-sizing:border-box}
+b,strong,h1,h2,h3,th,.btn,.num,.pill,.flow span,.mid,.who b{font-weight:700}
+h1,h2,h3{font-weight:700}
+body{margin:0;font-family:"Cera Pro","Inter",sans-serif;font-weight:300;color:var(--ink);font-size:11.5px;line-height:1.4}
+.page{width:210mm;height:297mm;padding:11mm 12mm;page-break-after:always;overflow:hidden;position:relative}
+.page:last-child{page-break-after:auto}
+h1{font-size:21px;margin:0 0 2px}
+.sub{color:var(--mut);margin-bottom:8px}
+.flow{display:flex;gap:4px;margin:6px 0 10px;flex-wrap:nowrap}
+.flow span{flex:1;text-align:center;background:var(--bg);border-radius:8px;padding:5px 2px;font-weight:600;font-size:9.5px}
+.flow span.hot{background:#ffe0ea;color:#FF034D}
+.step{display:flex;gap:8px;margin-bottom:14px}
+.num{flex:none;width:20px;height:20px;border-radius:50%;background:var(--red);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:11px}
+.step h2{font-size:12.5px;margin:0 0 3px}
+.cols{display:flex;gap:10px}
+.cols>div{flex:1}
+.ui{border:1px solid #d9dce5;border-radius:8px;background:#fff;padding:7px;box-shadow:0 1px 3px rgba(0,0,0,.08);position:relative}
+.cap{font-size:8.5px;color:var(--mut);text-align:right;margin-top:2px;font-style:italic}
+.in{border:1px solid #cfd3dc;border-radius:5px;padding:4px 6px;color:#9aa0ac;margin:3px 0;background:#fafafa}
+.btn{display:inline-block;border:1px solid #cfd3dc;border-radius:6px;padding:4px 7px;font-weight:600;background:#fff;margin:2px 2px 2px 0}
+.btn.p{background:var(--red);color:#fff;border-color:var(--red)}
+.btn.w{display:block;text-align:center}
+.nb{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:var(--blue);color:#fff;font-size:9px;font-weight:700;margin-right:5px;vertical-align:middle}
+ul.steps{list-style:none;margin-left:0}
+ul.steps li{margin:4px 0}
+ul.steps li:not(.has){padding-left:20px}
+.warn{color:var(--red);font-weight:700}
+.tag{position:static;display:inline-flex;margin:0 3px;vertical-align:middle;background:var(--blue);color:#fff;border-radius:50%;width:15px;height:15px;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #fff}
+table.t{border-collapse:collapse;width:100%}
+table.t th,table.t td{border:1px solid #e3e5ec;padding:3px 5px;text-align:left}
+table.t th{background:var(--bg)}
+.cb{display:inline-block;width:10px;height:10px;border:1.5px solid #9aa0ac;border-radius:2px;vertical-align:middle}
+.cb.on{background:var(--red);border-color:var(--red)}
+.pill{display:inline-block;border-radius:10px;padding:1px 7px;font-size:9px;font-weight:700}
+.g{background:#dcfce7;color:#166534}.o{background:#fef3c7;color:#92400e}.r{background:#ffe0ea;color:#FF034D}
+.banner{border-radius:8px;padding:8px 10px;margin:6px 0}
+.banner.hot{background:#fff1f2;border:1.5px solid var(--red)}
+.tip{background:#eff6ff;border-left:3px solid var(--blue);padding:5px 8px;border-radius:4px;margin:5px 0}
+.lane{display:flex;gap:8px;align-items:stretch}
+.who{flex:1;border-radius:8px;padding:6px;background:var(--bg)}
+.who b{display:block}
+.mid{flex:none;width:70px;background:#ede9fe;border-radius:8px;text-align:center;padding:6px 2px;color:var(--pur);font-weight:700;font-size:9.5px;display:flex;align-items:center;justify-content:center}
+h3{font-size:11.5px;margin:8px 0 3px}
+ul{margin:2px 0 2px 14px;padding:0}
+.page{padding-top:25mm}
+.top{position:absolute;left:0;top:0;right:0;height:16mm;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 12mm}
+.top .t{font-weight:700;font-size:12px;letter-spacing:.04em}
+.top .t span{font-weight:300}
+.top img{height:9mm;width:auto;max-width:60mm}
+.top:after{content:"";position:absolute;left:0;bottom:0;width:38mm;height:1.6mm;background:var(--red)}
+.foot{position:absolute;bottom:8mm;left:12mm;right:12mm;color:var(--mut);font-size:8.5px;display:flex;justify-content:space-between}
+</style></head><body>
+
+<!-- ================= PAGE 1 ================= -->
+<div class="page">
+<div class="top"><div class="t">Hi! PARIS <span>Career Fair 2026</span></div><img src="logos/hi-paris-logo.png" alt="" onerror="this.remove()"></div>
+<h1>🎓 Recruiter Quick-Start</h1>
+<div class="sub">Hi! PARIS Career Fair · 2 pages</div>
+<div class="flow"><span>🔐 Sign in</span><span>🔎 Find</span><span>📄 Open CV</span><span>✅ Mark</span><span>💾 Save</span><span>📊 Track</span><span class="hot">🔄 Refresh!</span></div>
+
+<div class="step"><div class="num">1</div><div style="flex:1">
+<h2>Sign in</h2>
+<div class="cols"><div>
+<div class="ui"><b>Hi! PARIS Career Fair 2026 – Your Sponsor Login</b>
+<div class="in"><span class="tag">1</span>Username</div><div class="in"><span class="tag">2</span>••••••••</div>
+<span class="btn p">🔐 Sign in</span><span class="tag">3</span></div>
+</div>
+<div><ul class="steps"><li class="has"><span class="nb">1</span>Username</li><li class="has"><span class="nb">2</span>Password (given by the organisers)</li><li class="has"><span class="nb">3</span>Click <b>Sign in</b></li><li>Use <b>your own sponsor's</b> app link</li><li>On shared devices, use <b>↪ Log out</b> in the header when done</li></ul></div></div>
+</div></div>
+
+<div class="step"><div class="num">2</div><div style="flex:1">
+<h2>Find a candidate → open the CV</h2>
+<div class="cols"><div>
+<div class="ui">
+<b style="font-size:10px">🔎 Find a candidate</b>
+<div class="in"><span class="tag">1</span>Type a first or last name…</div>
+<div><span class="btn">💾 Save now</span><span class="btn">🔄 Refresh</span><span class="btn">📅 Doodle</span></div>
+<div style="margin:4px 0">👤 <b>Candidate : Chloé Bernard</b> <span class="tag">2</span></div>
+<span class="btn">📄 Open CV</span><span class="tag">3</span><span class="btn">👁 Mark viewed</span><span class="btn">✉️ Mark contacted</span><span class="tag">4</span>
+</div></div>
+<div><ul class="steps"><li class="has"><span class="nb">1</span>Type a name; accents and capitals don't matter (<i>chloe</i> → <i>Chloé</i>)</li><li class="has"><span class="nb">2</span>Check you picked the right person</li><li class="has"><span class="nb">3</span><b>Open CV</b> opens the PDF in a new tab (allow pop-ups; on iPhone use Chrome)</li><li class="has"><span class="nb">4</span>Mark <b>viewed</b> / <b>contacted</b> in one click</li></ul>
+<div class="tip">👯 Two people can share a name. Check the CV before marking.</div></div></div>
+</div></div>
+
+<div class="step"><div class="num">3</div><div style="flex:1">
+<h2>Update the overview table</h2>
+<div class="cols"><div>
+<div class="ui"><b style="font-size:10px">👥 Candidates Overview</b>
+<table class="t"><tr><th>First name</th><th>Last name</th><th>Viewed</th><th>Interested</th><th>Saved</th><th>Contacted</th></tr>
+<tr><td>Alice</td><td>Martin</td><td><span class="cb on"></span></td><td><span class="cb"></span></td><td><span class="cb"></span></td><td><span class="cb"></span></td></tr>
+<tr><td>Bob</td><td>Durand</td><td><span class="cb on"></span></td><td><span class="cb on"></span></td><td><span class="cb on"></span></td><td><span class="cb"></span></td></tr></table></div>
+</div>
+<div><ul><li>Tick the boxes directly.</li><li class="warn">⚠️ Names are read-only: you can’t edit them here.</li><li><b>Viewed</b> looked at · <b>Interested</b> follow up · <b>Saved</b> CV kept · <b>Contacted</b> reached out</li><li>With a candidate selected, only that person shows. Clear the search to see everyone.</li></ul></div></div>
+</div></div>
+
+<div class="step"><div class="num">4</div><div style="flex:1">
+<h2>Save</h2>
+<div class="cols"><div>
+<div class="ui"><span class="pill o">⏳ Changes pending — saving in 0.4s…</span> → <span class="pill g">✅ All changes saved</span></div></div>
+<div><ul><li>Autosave runs about <b>1 second</b> after your last click.</li><li>Press <span class="btn">💾 Save now</span> to force it.</li><li><b>Wait for ✅</b> before closing the tab. <span class="pill r">❌ Save failed</span> keeps your changes: press <span class="btn">💾 Save now</span> again.</li></ul></div></div>
+</div></div>
+<div class="foot"><span>Hi! PARIS Career Fair 2026</span><span>Page 1 / 2</span></div>
+</div>
+
+<!-- ================= PAGE 2 ================= -->
+<div class="page">
+<div class="top"><div class="t">Hi! PARIS <span>Career Fair 2026</span></div><img src="logos/hi-paris-logo.png" alt="" onerror="this.remove()"></div>
+<h1>🔄 Working together: Refresh</h1>
+<div class="sub">Several recruiters can edit the same list at the same time. Here is how to stay in sync.</div>
+
+<div class="banner hot">
+<b>Your screen is your own copy.</b> When a colleague saves, your browser does <b>not</b> necessarily update right away. Press <span class="btn p">🔄 Refresh</span> to fetch the latest shared list and merge it with your work.
+</div>
+
+<div class="lane">
+<div class="who"><b>👩‍💼 Recruiter A</b>marks Alice as <i>Viewed</i></div>
+<div class="mid">🔀<br>auto-<br>merge</div>
+<div class="who"><b>👨‍💼 Recruiter B</b>marks Bob as <i>Contacted</i></div>
+<div class="mid" style="background:#dcfce7;color:#166534">✅<br>both<br>kept</div>
+</div>
+
+<div class="cols" style="margin-top:8px">
+<div>
+<h3>🟢 Press <span class="btn">🔄 Refresh</span>…</h3>
+<ul>
+<li><b>when you start</b> working</li>
+<li><b>before</b> relying on a colleague's status ("already contacted?")</li>
+<li>when a colleague says <i>"I just updated the list"</i></li>
+<li>if something looks out of date</li>
+<li><b>before you finish</b></li>
+</ul>
+<h3>🥇 4 golden rules</h3>
+<ol style="margin:2px 0 2px 14px;padding:0">
+<li><b><span class="btn">🔄 Refresh</span> when you start, then edit.</b></li>
+<li><b>Wait for ✅ All changes saved</b> before you close the tab or press <span class="btn">🔄 Refresh</span>.</li>
+<li><b>Split the work</b> (e.g. by alphabet) if two of you edit at once.</li>
+<li><b>Conflict message</b> or banner <i>"Another recruiter made changes…"</i>: save, then <span class="btn">🔄 Refresh</span>, and check the final checkboxes.</li>
+</ol>
+</div>
+<div>
+<h2>🔀 What the merge does</h2>
+<table class="t">
+<tr><th>Situation</th><th>Result</th></tr>
+<tr><td>Different candidates</td><td>✅ both kept</td></tr>
+<tr><td>Same candidate, different boxes</td><td>✅ both kept</td></tr>
+<tr><td>Same box, same value</td><td>✅ fine</td></tr>
+<tr><td>Same box, different values</td><td>⚠️ <b>your value wins</b> + message</td></tr>
+</table>
+<div class="tip">💡 Refresh never replaces your own unsaved work, but it is <b>not</b> a save button either.</div>
+</div></div>
+
+<div class="step" style="margin-top:8px"><div class="num">5</div><div style="flex:1">
+<h3>Track progress and filter</h3>
+<div class="cols"><div>
+<div class="ui"><b style="font-size:10px">📊 Candidates tracking</b>
+<div style="margin:3px 0">👥 <b>120 candidates</b> · 👁️ 45 viewed · 👍 18 interested · 🔖 12 CVs saved · ✉️ 9 contacted</div>
+<div class="in" style="color:#262730">Filter candidates: <b>Interested ▾</b></div></div>
+</div>
+<div><ul><li>The summary line counts <b>everyone</b>.</li><li>Pick <b>All · Viewed · Interested · CVs saved · Contacted</b> to build your follow-up list.</li><li>Changing the filter keeps your edits.</li><li>Refresh first for a team-wide picture.</li></ul></div></div>
+</div></div>
+
+<div class="step"><div class="num">6</div><div style="flex:1">
+<h3>📅 Doodle</h3>
+The <span class="btn">📅 Doodle</span> button opens your sponsor's booking board. Students book 5-minute slots through the QR code; you use the button to see who booked.
+</div></div>
+
+<ol style="margin:2px 0 2px 14px;padding:0">
+<h3>🆘 Quick fixes</h3>
+<table class="t">
+<tr><th>Problem</th><th>Try this</th></tr>
+<tr><td>CV does not open</td><td>Allow pop-ups · iPhone: use Chrome · else tell the organisers (file may be missing)</td></tr>
+<tr><td>A colleague's edits are missing</td><td>Wait for ✅ saved, then <span class="btn">🔄 Refresh</span></td></tr>
+<tr><td>❌ Save failed</td><td>Press <span class="btn">💾 Save now</span> · keep the tab open · tell the organisers if it repeats</td></tr>
+<tr><td>Can't sign in</td><td>Right sponsor app? Retype the password</td></tr>
+</table>
+<div class="foot"><span>Hi! PARIS Career Fair 2026</span><span>Page 2 / 2</span></div>
+</div>
+</body></html>
+</ol>
